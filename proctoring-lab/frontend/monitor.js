@@ -472,6 +472,11 @@ function renderSummary(analysis) {
     ["Visibility hidden", valueFrom(summary, "visibility_hidden_count") ?? 0],
     ["Fullscreen exits", valueFrom(summary, "fullscreen_exit_count") ?? 0],
     ["Paste events", valueFrom(summary, "paste_count") ?? 0],
+    ["Fullscreen errors", valueFrom(summary, "fullscreen_error_count") ?? 0],
+    ["Network changes", valueFrom(summary, "network_change_count") ?? 0],
+    ["Fetch failures", valueFrom(summary, "fetch_failure_count") ?? 0],
+    ["Editor changes", valueFrom(summary, "editor_change_count") ?? 0],
+    ["Mock submissions", valueFrom(summary, "submission_count") ?? 0],
     ["Longest heartbeat gap", longestGap === null ? "Not measured" : `${Math.round(Number(longestGap))} ms`],
     ["Average heartbeat", averageInterval === null ? "Not measured" : `${Math.round(Number(averageInterval))} ms`],
     ["Markers", valueFrom(summary, "marker_count") ?? 0],
@@ -611,7 +616,10 @@ function renderCorrelations(correlations) {
         return signal.event_type || signal.kind || "event";
       }).join(" · ") : (correlation.observation || "No browser signals observed within ±3 seconds.");
     } else {
-      const parts = Object.entries(signals).map(([key, value]) => `${key.replaceAll("_", " ")}: ${signalText(value)}`);
+      const parts = Object.entries(signals).map(([key, value]) => {
+        if (key === "browser_state_snapshot" && value && typeof value === "object") return `browser snapshot: ${JSON.stringify(value)}`;
+        return `${key.replaceAll("_", " ")}: ${signalText(value)}`;
+      });
       note.textContent = parts.length ? parts.join(" · ") : "No browser signals observed within ±3 seconds.";
     }
     box.append(title, note); container.append(box);
@@ -622,7 +630,7 @@ function renderMatrix(rows) {
   const container = $("matrix-table");
   container.replaceChildren();
   if (!rows.length) { container.textContent = "Add labeled markers during a test to populate this table from measured data."; return; }
-  const columns = [["action", "Action"], ["visibilitychange", "Visibility change"], ["blur", "Blur"], ["fullscreenchange", "Fullscreen change"], ["heartbeat_anomaly", "Heartbeat anomaly"], ["clipboard_signal", "Clipboard signal"], ["browser_observable", "Browser observable?"]];
+  const columns = [["action", "Action"], ["visibilitychange", "Visibility change"], ["blur", "Blur"], ["fullscreenchange", "Fullscreen change"], ["heartbeat_anomaly", "Heartbeat anomaly"], ["heartbeat_gap_ms", "Max gap (ms)"], ["network_change", "Network change"], ["clipboard_signal", "Clipboard signal"], ["browser_observable", "Browser observable?"]];
   const table = document.createElement("table");
   const head = document.createElement("thead"), headingRow = document.createElement("tr");
   for (const [, label] of columns) { const cell = document.createElement("th"); cell.textContent = label; headingRow.append(cell); }
