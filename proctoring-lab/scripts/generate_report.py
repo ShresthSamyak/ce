@@ -11,19 +11,34 @@ import sys
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import UUID
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MAX_REPORT_BYTES = 8 * 1024 * 1024
 
 
+class NoRedirects(HTTPRedirectHandler):
+    """Keep this helper from following a local response to an external URL."""
+
+    def redirect_request(
+        self,
+        request: Request,
+        fp: object,
+        code: int,
+        msg: str,
+        headers: object,
+        newurl: str,
+    ) -> None:
+        return None
+
+
 def local_base_url(value: str) -> str:
-    """Require plain HTTP to the local loopback interface only."""
+    """Require plain HTTP to 127.0.0.1 only."""
     parsed = urlparse(value)
     if (
         parsed.scheme != "http"
-        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or parsed.hostname != "127.0.0.1"
         or parsed.username is not None
         or parsed.password is not None
         or parsed.path not in {"", "/"}
@@ -31,6 +46,10 @@ def local_base_url(value: str) -> str:
         or parsed.fragment
     ):
         raise argparse.ArgumentTypeError("API URL must be local HTTP, such as http://127.0.0.1:8000")
+    try:
+        parsed.port
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("API URL has an invalid port") from exc
     return value.rstrip("/")
 
 
@@ -47,7 +66,7 @@ def fetch_report(session_id: UUID, base_url: str) -> bytes:
         f"{base_url}/api/session/{session_id}/report",
         headers={"Accept": "text/html"},
     )
-    with urlopen(request, timeout=15) as response:
+    with build_opener(NoRedirects()).open(request, timeout=15) as response:
         content_type = response.headers.get_content_type()
         if content_type != "text/html":
             raise ValueError(f"Expected HTML report, received {content_type}")
