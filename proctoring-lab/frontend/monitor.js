@@ -135,6 +135,8 @@ function eventDescription(type, payload = {}) {
   if (type === "beforeunload") return "page about to unload";
   if (type === "pagehide") return "page hidden or unloaded";
   if (type === "pageshow") return "page shown";
+  if (type === "start") return "session started";
+  if (type === "end") return "session ended";
   return type.replaceAll("_", " ");
 }
 
