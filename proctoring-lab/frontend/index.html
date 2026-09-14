@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proctoring Lab — local assessment simulation</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/monitor.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <p class="eyebrow">PROCTORING LAB</p>
+      <h1>PROCTORING SIMULATION — LOCAL TEST ENVIRONMENT</h1>
+      <p class="subheading">A controlled page for measuring browser-observable signals. No code is executed or graded.</p>
+    </div>
+    <span class="local-badge" aria-label="Localhost only">● LOCAL ONLY</span>
+  </header>
+
+  <main>
+    <section class="control-panel panel" aria-labelledby="session-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">EXPERIMENT CONTROL</p><h2 id="session-heading">Session</h2></div>
+        <span id="session-status" class="status-badge status-idle" role="status">Ready</span>
+      </div>
+      <dl class="environment-grid">
+        <div><dt>Session ID</dt><dd id="session-id" class="mono">—</dd></div>
+        <div><dt>Start time</dt><dd id="session-start">Not started</dd></div>
+        <div><dt>Browser</dt><dd id="browser-name">—</dd></div>
+        <div><dt>Platform</dt><dd id="platform-name">—</dd></div>
+        <div><dt>Viewport</dt><dd id="viewport-size">—</dd></div>
+        <div><dt>Screen resolution</dt><dd id="screen-size">—</dd></div>
+      </dl>
+      <div class="button-row">
+        <button id="start-test" class="button button-primary">START TEST</button>
+        <button id="end-test" class="button button-secondary" disabled>END TEST</button>
+        <button id="add-marker" class="button button-secondary" disabled>ADD TEST MARKER</button>
+        <button id="view-report" class="button button-quiet" disabled>OPEN HTML REPORT ↗</button>
+      </div>
+      <p id="app-message" class="app-message" role="status" aria-live="polite">Start a test to record browser events and two-second heartbeats.</p>
+    </section>
+
+    <section class="assessment-grid" aria-label="Mock coding assessment">
+      <article class="problem panel">
+        <div class="section-heading"><div><p class="eyebrow">PROBLEM 01 · PRACTICE</p><h2>Sum of integers</h2></div><span class="difficulty">Easy</span></div>
+        <p>Given <var>N</var> integers, output their sum.</p>
+        <h3>Input</h3>
+        <p>The first line contains <var>N</var>. The second line contains <var>N</var> space-separated integers.</p>
+        <h3>Output</h3>
+        <p>Print one integer: the sum of the given values.</p>
+        <h3>Sample input</h3>
+        <pre><code>4
+3 7 -2 5</code></pre>
+        <h3>Sample output</h3>
+        <pre><code>13</code></pre>
+        <p class="muted">This is a mock assessment. Run and Submit only record a local UI action; they do not execute code.</p>
+      </article>
+
+      <section class="editor-panel panel" aria-labelledby="editor-heading">
+        <div class="section-heading"><div><p class="eyebrow">WORKSPACE</p><h2 id="editor-heading">Code editor</h2></div><label class="language-label">Language <select id="language"><option>Python 3</option><option>JavaScript</option><option>C++</option><option>Java</option></select></label></div>
+        <label for="code-editor" class="sr-only">Practice code</label>
+        <textarea id="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="editor-note"># Write practice code here.
+# This simulation does not execute or grade submissions.</textarea>
+        <div class="editor-actions"><span id="editor-note" class="muted">Your code stays in this page and is never sent to the server.</span><div class="button-row"><button id="run-code" class="button button-secondary">Run</button><button id="submit-code" class="button button-primary">Submit</button></div></div>
+        <p id="editor-result" class="editor-result" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+
+    <section class="observations-grid">
+      <section class="monitor panel" aria-labelledby="monitor-heading">
+        <div class="section-heading"><div><p class="eyebrow">LIVE TELEMETRY</p><h2 id="monitor-heading">EVENT MONITOR</h2></div><span id="event-total" class="counter">0 events</span></div>
+        <p class="muted">The live list shows page signals received during this test. It never displays typed keys or clipboard contents.</p>
+        <ol id="event-list" class="event-list" aria-live="polite" aria-relevant="additions"><li class="empty-state">Events will appear here after you start.</li></ol>
+      </section>
+      <section class="experiments panel" aria-labelledby="experiments-heading">
+        <div class="section-heading"><div><p class="eyebrow">MANUAL PROCEDURES</p><h2 id="experiments-heading">Experiment templates</h2></div></div>
+        <label for="experiment-select">Choose a procedure</label>
+        <select id="experiment-select">
+          <option value="a">A · Browser tab switch</option>
+          <option value="b">B · Alt-Tab to another application</option>
+          <option value="c">C · Minimize browser</option>
+          <option value="d">D · Fullscreen enter and exit</option>
+          <option value="e">E · Copy and paste</option>
+          <option value="f">F · Benign overlay</option>
+          <option value="g">G · VMware host minimize</option>
+          <option value="h">H · VMware guest Alt-Tab</option>
+          <option value="i">I · Switch host application</option>
+        </select>
+        <div id="experiment-instructions" class="instructions" aria-live="polite"></div>
+        <p class="muted">Follow the steps manually. Add a marker after the action so analysis can compare it with nearby browser telemetry.</p>
+      </section>
+    </section>
+
+    <section id="analysis-section" class="analysis panel" aria-labelledby="analysis-heading" hidden>
+      <div class="section-heading"><div><p class="eyebrow">MEASURED RESULTS</p><h2 id="analysis-heading">Session analysis</h2></div></div>
+      <div id="summary-cards" class="summary-cards"></div>
+      <h3>Chronological timeline</h3>
+      <div id="timeline-visual" class="timeline-visual" role="img" aria-label="Horizontal event timeline"></div>
+      <ol id="timeline-list" class="timeline-list"></ol>
+      <h3>Heartbeat intervals</h3>
+      <div id="heartbeat-graph" class="graph-wrap"></div>
+      <p class="muted">Normal: under 4 s · Warning: 4–8 s · Large gap: over 8 s. A gap alone does not prove any external action.</p>
+      <h3>Marker correlation (±3 seconds)</h3>
+      <div id="correlation-list"></div>
+      <h3>Detection matrix</h3>
+      <div id="matrix-table" class="table-wrap"></div>
+      <p class="limitations">Absence of a browser event does not imply absence of external activity. This simulation measures only signals accessible to the local browser page.</p>
+    </section>
+  </main>
+
+  <dialog id="marker-dialog" aria-labelledby="marker-heading">
+    <form method="dialog" id="marker-form">
+      <h2 id="marker-heading">Add test marker</h2>
+      <p>Describe the action you just performed. The label is stored alongside browser telemetry.</p>
+      <label for="marker-label">Action label</label>
+      <input id="marker-label" name="label" type="text" maxlength="120" required placeholder="e.g. Minimized VMware window">
+      <div class="button-row"><button type="button" id="cancel-marker" class="button button-quiet">Cancel</button><button type="submit" class="button button-primary">Save marker</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
