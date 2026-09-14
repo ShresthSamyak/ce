@@ -106,6 +106,8 @@ function setStatus(status) {
   $("end-test").disabled = !["active", "end-error"].includes(status);
   $("add-marker").disabled = status !== "active";
   $("view-report").disabled = status !== "ended";
+  $("export-json").disabled = status !== "ended";
+  $("export-csv").disabled = status !== "ended";
   $("run-code").disabled = status !== "active";
   $("submit-code").disabled = status !== "active";
   updateEnvironment();
@@ -363,6 +365,7 @@ async function startTest() {
     });
     state.id = result.id;
     state.startedAt = result.started_at;
+    state.durationMinutes = result.duration_minutes || state.durationMinutes;
     updateEnvironment();
     updateElapsed();
     setStatus("active");
@@ -396,6 +399,9 @@ async function endTest() {
   }
   setStatus("ended");
   try {
+    const submissionHistory = await api(`/api/session/${encodeURIComponent(state.id)}/submissions`);
+    state.submissions = submissionHistory.items || state.submissions;
+    renderSubmissionHistory();
     const analysis = await api(`/api/session/${encodeURIComponent(state.id)}/analysis`);
     renderAnalysis(analysis);
     $("analysis-section").hidden = false;
@@ -803,7 +809,6 @@ function initEditor() {
   $("reset-code").addEventListener("click", () => {
     if (!window.confirm("Replace the current draft with the starter comment?")) return;
     editor.value = starterCode[currentLanguage];
-    editorDrafts[currentLanguage] = editor.value;
     editorDrafts[draftKey()] = editor.value;
     lastEditorLength = editor.value.length;
     editor.focus();
@@ -856,12 +861,13 @@ function init() {
   $("telemetry-backdrop").addEventListener("click", () => setTelemetryOpen(false));
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") setTelemetryOpen(false); });
   $("view-report").addEventListener("click", () => window.open(`/api/session/${encodeURIComponent(state.id)}/report`, "_blank", "noopener"));
+  $("export-json").addEventListener("click", () => { window.location.href = `/api/session/${encodeURIComponent(state.id)}/export/json`; });
+  $("export-csv").addEventListener("click", () => { window.location.href = `/api/session/${encodeURIComponent(state.id)}/export/csv`; });
   $("toggle-fullscreen").addEventListener("click", async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
-    } catch (error) { setMessage(`Page fullscreen request failed: ${error.message}`, true); }
-    // A failed request is recorded as a page signal, without the error text.
+    } catch (error) { recordEvent("fullscreen_error"); setMessage(`Page fullscreen request failed: ${error.message}`, true); }
   });
 }
 
