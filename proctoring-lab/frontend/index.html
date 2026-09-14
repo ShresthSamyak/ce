@@ -11,11 +11,11 @@
 <body>
   <header class="site-header">
     <div class="site-identity"><span class="brand-mark" aria-hidden="true">PL</span><div>
-      <p class="eyebrow">PROCTORING LAB / PRACTICE CONTEST</p>
+      <p class="eyebrow">PROCTORING LAB / UNIVERSITY PRACTICE ASSESSMENT</p>
       <h1>PROCTORING SIMULATION — LOCAL TEST ENVIRONMENT</h1>
-      <p class="subheading">A controlled coding-assessment page for measuring browser-observable signals.</p>
+      <p class="subheading">Generic coding assessment with page-local observation. No code is executed or graded.</p>
     </div></div>
-    <span class="local-badge" aria-label="Localhost only">● LOCAL ONLY</span>
+    <span class="local-badge" aria-label="Localhost only">● 127.0.0.1 ONLY</span>
   </header>
 
   <main>
@@ -42,55 +42,62 @@
     </section>
 
     <section class="assessment-bar" aria-label="Assessment status">
-      <div class="assessment-title"><strong>Practice contest</strong><span>1 problem</span><span class="assessment-pill">Unranked simulation</span></div>
-      <div class="assessment-tools"><span class="elapsed-label">Elapsed <strong id="elapsed-time">00:00</strong></span><button id="toggle-fullscreen" class="button button-quiet">TOGGLE PAGE FULLSCREEN</button></div>
+      <div class="assessment-title"><strong>Programming Assessment</strong><span class="assessment-pill">Practice / unranked</span><span class="assessment-pill">3 questions</span></div>
+      <nav class="question-tabs" aria-label="Question tabs"><button type="button" class="question-tab is-current" data-question="q1" aria-current="page">Q1</button><button type="button" class="question-tab" data-question="q2">Q2</button><button type="button" class="question-tab" data-question="q3">Q3</button></nav>
+      <div class="assessment-tools"><span class="elapsed-label">Time left <strong id="time-left">60:00</strong></span><span class="elapsed-label">Elapsed <strong id="elapsed-time">00:00</strong></span><span class="assessment-session">Session <strong id="header-session">Not started</strong></span><button id="toggle-fullscreen" class="button button-quiet">PAGE FULLSCREEN</button><button id="toggle-telemetry" class="button button-secondary" aria-controls="telemetry-sidebar" aria-expanded="false">TELEMETRY <span id="warning-count">0</span></button></div>
     </section>
 
     <section class="assessment-grid" aria-label="Mock coding assessment">
       <aside class="problem-nav panel" aria-label="Problem navigation">
         <p class="eyebrow">PROBLEMS</p>
-        <div class="problem-nav-item" aria-current="page"><span class="problem-index">A</span><span><strong>Sum of integers</strong><small id="problem-state">Not submitted</small></span></div>
-        <p class="nav-note">One local practice task. There is no ranking or remote judge.</p>
+        <button type="button" class="problem-nav-item is-current" data-question="q1" aria-current="page"><span class="problem-index">1</span><span><strong>Sum of integers</strong><small id="nav-state-q1">Not submitted</small></span></button>
+        <button type="button" class="problem-nav-item" data-question="q2"><span class="problem-index">2</span><span><strong>Largest value</strong><small id="nav-state-q2">Not submitted</small></span></button>
+        <button type="button" class="problem-nav-item" data-question="q3"><span class="problem-index">3</span><span><strong>Count even values</strong><small id="nav-state-q3">Not submitted</small></span></button>
+        <p class="nav-note">Drafts stay in this browser tab. There is no remote judge.</p>
       </aside>
       <article class="problem panel">
-        <div class="section-heading"><div><p class="eyebrow">PROBLEM A · PRACTICE</p><h2>Sum of integers</h2></div><span class="difficulty">Easy</span></div>
+        <div class="section-heading"><div><p id="problem-kicker" class="eyebrow">QUESTION 1 / 3 · PRACTICE</p><h2 id="problem-title">Sum of integers</h2></div><span class="difficulty">Easy</span></div>
         <div class="problem-meta"><span>Time limit: simulated</span><span>Memory limit: simulated</span><span>Judge: unavailable</span></div>
-        <p>Given <var>N</var> integers, output their sum. The values may be positive, negative, or zero.</p>
+        <p id="problem-description">Given N integers, output their sum. The values may be positive, negative, or zero.</p>
         <h3>Input format</h3>
-        <p>The first line contains <var>N</var>. The second line contains <var>N</var> space-separated integers.</p>
+        <p id="input-format">The first line contains N. The second line contains N space-separated integers.</p>
         <h3>Output format</h3>
-        <p>Print one integer: the sum of the given values.</p>
+        <p id="output-format">Print one integer: the sum of the given values.</p>
         <h3>Constraints</h3>
-        <ul class="constraints"><li>1 ≤ <var>N</var> ≤ 100,000</li><li>−1,000,000 ≤ each integer ≤ 1,000,000</li></ul>
+        <ul id="constraints-list" class="constraints"><li>1 ≤ N ≤ 100,000</li><li>−1,000,000 ≤ each integer ≤ 1,000,000</li></ul>
         <div class="samples"><section><h3>Sample input <button type="button" id="copy-sample" class="text-button" aria-label="Copy sample input">Copy sample</button></h3><pre><code id="sample-input">4
-3 7 -2 5</code></pre></section><section><h3>Sample output</h3><pre><code>13</code></pre></section></div>
-        <h3>Explanation</h3><p><code>3 + 7 + (−2) + 5 = 13</code>.</p>
+3 7 -2 5</code></pre></section><section><h3>Sample output</h3><pre><code id="sample-output">13</code></pre></section></div>
+        <h3>Explanation</h3><p id="problem-explanation">3 + 7 + (−2) + 5 = 13.</p>
         <p class="problem-disclaimer">Practice only: code is not executed or graded, and no source code is sent to the server.</p>
       </article>
 
       <section class="editor-panel panel" aria-labelledby="editor-heading">
-        <div class="section-heading"><div><p class="eyebrow">WORKSPACE / PROBLEM A</p><h2 id="editor-heading">Code editor</h2></div><label class="language-label">Language <select id="language"><option>Python 3</option><option>JavaScript</option><option>C++</option><option>Java</option></select></label></div>
+        <div class="section-heading"><div><p id="workspace-question" class="eyebrow">WORKSPACE / QUESTION 1</p><h2 id="editor-heading">Code editor</h2></div><label class="language-label">Language <select id="language"><option>Python</option><option>C</option><option>C++</option><option>Java</option></select></label></div>
         <div class="editor-toolbar"><span>main.<span id="editor-extension">py</span></span><div><label for="font-size">Font size</label> <select id="font-size"><option value="13">13</option><option value="14" selected>14</option><option value="16">16</option><option value="18">18</option></select><button id="reset-code" type="button" class="text-button">Reset draft</button></div></div>
         <label for="code-editor" class="sr-only">Practice code</label>
         <textarea id="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="editor-note"># Write practice code here.
-# This simulation does not execute or grade submissions.</textarea>
-        <div class="editor-status"><span id="cursor-position">Ln 1, Col 1</span><span id="editor-note">Tab inserts spaces · Code remains in this browser tab</span></div>
+# Source stays in this tab; the mock judge receives code length only.</textarea>
+        <div class="editor-status"><span id="cursor-position">Ln 1, Col 1</span><span id="editor-note">Tab inserts spaces · Drafts remain in this browser tab</span></div>
         <section class="input-panel" aria-labelledby="input-heading"><div class="input-head"><h3 id="input-heading">Input for local practice</h3><span>Not sent to server</span></div><div class="input-switch" role="group" aria-label="Input source"><button type="button" id="use-sample" class="input-choice is-selected" aria-pressed="true">Sample input</button><button type="button" id="use-custom" class="input-choice" aria-pressed="false">Custom input</button></div><label for="custom-input" class="sr-only">Custom input</label><textarea id="custom-input" class="custom-input" spellcheck="false" aria-label="Practice input" readonly>4
 3 7 -2 5</textarea></section>
-        <div class="editor-actions"><span class="muted">Run and Submit simulate assessment actions; no program runs.</span><div class="button-row"><button id="run-code" class="button button-secondary">Run code</button><button id="submit-code" class="button button-primary">Submit solution</button></div></div>
-        <section class="result-panel" aria-labelledby="result-heading"><div class="result-heading"><h3 id="result-heading">Result</h3><span id="result-state" class="result-state">Not run</span></div><p id="editor-result" class="editor-result" role="status" aria-live="polite">Select an input and click Run code to record a local practice action.</p><div class="output-grid"><div><strong>Expected sample output</strong><pre id="expected-output">13</pre></div><div><strong>Program output</strong><pre id="program-output">Not available — code execution is disabled.</pre></div></div><p id="submission-count" class="submission-count">Mock submissions this visit: 0</p></section>
+        <div class="editor-actions"><span class="muted">Start a test to use the mock Run/Submit service. Source and custom input stay in this tab.</span><div class="button-row"><button id="run-code" class="button button-secondary" disabled>Run code</button><button id="submit-code" class="button button-primary" disabled>Submit solution</button></div></div>
+        <section class="result-panel" aria-labelledby="result-heading"><div class="result-heading"><h3 id="result-heading">Result</h3><span id="result-state" class="result-state">Not run</span></div><p id="editor-result" class="editor-result" role="status" aria-live="polite">Start a test, then click Run code or Submit solution to create a mock record.</p><div class="output-grid"><div><strong>Expected sample output</strong><pre id="expected-output">13</pre></div><div><strong>Program output</strong><pre id="program-output">Unavailable — code execution is disabled.</pre></div></div><p id="submission-count" class="submission-count">Mock submissions this session: 0</p><h3 class="history-title">Submission history</h3><ol id="submission-history" class="submission-history"><li>No mock submissions yet.</li></ol></section>
       </section>
     </section>
 
+    <aside id="telemetry-sidebar" class="telemetry-sidebar" aria-labelledby="monitor-heading" aria-hidden="true">
+      <div class="section-heading"><div><p class="eyebrow">LOCAL BROWSER SIGNALS</p><h2 id="monitor-heading">EVENT MONITOR</h2></div><button id="close-telemetry" class="icon-button" aria-label="Close telemetry panel">×</button></div>
+      <p class="muted">Safe metadata only. No keys, source, or clipboard text.</p>
+      <div class="telemetry-controls"><label for="event-filter">Show</label><select id="event-filter"><option value="all">All signals</option><option value="focus">Focus</option><option value="visibility">Visibility</option><option value="fullscreen">Fullscreen</option><option value="clipboard">Clipboard</option><option value="heartbeat">Heartbeats</option><option value="marker">Markers</option><option value="interaction">Other page events</option></select><span id="event-total" class="counter">0 events</span></div>
+      <section class="warning-panel" aria-labelledby="warning-heading"><h3 id="warning-heading">Timing warnings</h3><ol id="warning-list"><li>No heartbeat anomalies measured.</li></ol><p>Warnings indicate timing gaps only; they do not prove an external action.</p></section>
+      <ol id="event-list" class="event-list" aria-live="polite" aria-relevant="additions"><li class="empty-state">Events will appear after START TEST.</li></ol>
+    </aside>
+    <div id="telemetry-backdrop" class="telemetry-backdrop" hidden></div>
+
     <section class="observations-grid">
-      <section class="monitor panel" aria-labelledby="monitor-heading">
-        <div class="section-heading"><div><p class="eyebrow">LIVE TELEMETRY</p><h2 id="monitor-heading">EVENT MONITOR</h2></div><span id="event-total" class="counter">0 events</span></div>
-        <p class="muted">The live list shows page signals received during this test. It never displays typed keys or clipboard contents.</p>
-        <ol id="event-list" class="event-list" aria-live="polite" aria-relevant="additions"><li class="empty-state">Events will appear here after you start.</li></ol>
-      </section>
       <section class="experiments panel" aria-labelledby="experiments-heading">
         <div class="section-heading"><div><p class="eyebrow">MANUAL PROCEDURES</p><h2 id="experiments-heading">Experiment templates</h2></div></div>
-        <label for="experiment-select">Choose a procedure</label>
+        <div class="experiment-controls"><label for="experiment-select">Choose a procedure</label><label class="vm-toggle"><input id="vm-mode" type="checkbox"> VMware guest mode</label></div>
         <select id="experiment-select">
           <option value="a">A · Browser tab switch</option>
           <option value="b">B · Alt-Tab to another application</option>
@@ -104,7 +111,9 @@
         </select>
         <div id="experiment-instructions" class="instructions" aria-live="polite"></div>
         <p class="muted">Follow the steps manually. Markers use a ±3-second window; for longer actions, add a marker before and another after so earlier signals are not missed.</p>
+        <div class="marker-presets"><span>Quick markers</span><button type="button" data-marker="Before action">Before action</button><button type="button" data-marker="Returned to page">Returned to page</button><button type="button" data-marker="VMware minimized">VMware minimized</button><button type="button" data-marker="Overlay opened">Overlay opened</button></div>
       </section>
+      <details class="security-panel panel"><summary>Security boundary and limitations</summary><div><p><strong>Host OS → VMware → Guest OS → Browser → JavaScript page.</strong> This page measures browser events, snapshots, and heartbeat timing available in its own tab. It cannot directly inspect arbitrary host processes, windows, or overlays.</p><p>Focus and timer behavior may vary by browser, OS, VM configuration, and power state. A missing browser event means only that this local page did not observe that signal in the measured period.</p><p><strong>Ethical use:</strong> conduct experiments only against this included local simulation. Do not interfere with or evade monitoring on an actual examination platform.</p></div></details>
     </section>
 
     <section id="analysis-section" class="analysis panel" aria-labelledby="analysis-heading" hidden>

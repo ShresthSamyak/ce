@@ -12,6 +12,11 @@ const state = {
   eventCount: 0,
   pendingEvents: new Set(),
   pendingHeartbeatRequest: null,
+  eventSequence: 0,
+  warningCount: 0,
+  durationMinutes: 60,
+  submissions: [],
+  domContentLoaded: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -27,16 +32,23 @@ const experimentTemplates = {
   i: { title: "I · Switch host application", steps: ["Inside the guest VM, start the session and leave the guest browser open.", "On the host OS, switch to another host application without automating the guest.", "Return to VMware.", "Add a marker labeled “Host application switch”."], marker: "Host application switch" },
 };
 
+const questions = {
+  q1: { number: 1, title: "Sum of integers", description: "Given N integers, output their sum. Values may be positive, negative, or zero.", input: "The first line contains N. The second line contains N space-separated integers.", output: "Print one integer: the sum of the given values.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer ≤ 1,000,000"], sampleInput: "4\n3 7 -2 5", sampleOutput: "13", explanation: "3 + 7 + (−2) + 5 = 13." },
+  q2: { number: 2, title: "Largest value", description: "Given N integers, output the largest value in the list.", input: "The first line contains N. The second line contains N space-separated integers.", output: "Print one integer: the largest given value.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer ≤ 1,000,000"], sampleInput: "5\n-4 8 3 8 1", sampleOutput: "8", explanation: "The largest value in the list is 8." },
+  q3: { number: 3, title: "Count even values", description: "Given N integers, count how many are divisible by 2.", input: "The first line contains N. The second line contains N space-separated integers.", output: "Print one integer: the number of even values.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer ≤ 1,000,000"], sampleInput: "6\n2 7 0 -3 -8 5", sampleOutput: "3", explanation: "The even values are 2, 0, and −8." },
+};
 const starterCode = {
-  "Python 3": "# Write your solution here.\n# This local lab does not execute or grade code.\n",
-  JavaScript: "// Write your solution here.\n// This local lab does not execute or grade code.\n",
+  Python: "# Write your solution here.\n# This local lab does not execute or grade code.\n",
+  C: "// Write your solution here.\n// This local lab does not execute or grade code.\n",
   "C++": "// Write your solution here.\n// This local lab does not execute or grade code.\n",
   Java: "// Write your solution here.\n// This local lab does not execute or grade code.\n",
 };
 const editorDrafts = {};
-let currentLanguage = "Python 3";
-let mockSubmissionCount = 0;
-let customInputDraft = "";
+const customInputDrafts = {};
+const inputModes = {};
+let currentQuestion = "q1";
+let currentLanguage = "Python";
+let lastEditorLength = 0;
 
 function browserName() {
   const ua = navigator.userAgent;
@@ -53,6 +65,7 @@ function currentPlatform() {
 
 function updateEnvironment() {
   $("session-id").textContent = state.id;
+  $("header-session").textContent = state.status === "idle" ? "Not started" : `${state.id.slice(0, 8)}…`;
   $("session-start").textContent = state.startedAt ? formatDateTime(state.startedAt) : "Not started";
   $("browser-name").textContent = browserName();
   $("platform-name").textContent = currentPlatform();
@@ -63,6 +76,9 @@ function updateEnvironment() {
 function updateElapsed() {
   const seconds = state.startedAt ? Math.max(0, Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000)) : 0;
   $("elapsed-time").textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const remaining = Math.max(0, state.durationMinutes * 60 - seconds);
+  $("time-left").textContent = `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
+  $("time-left").classList.toggle("time-warning", remaining <= 300 && state.startedAt !== null);
 }
 
 function formatDateTime(value) {
@@ -90,21 +106,39 @@ function setStatus(status) {
   $("end-test").disabled = !["active", "end-error"].includes(status);
   $("add-marker").disabled = status !== "active";
   $("view-report").disabled = status !== "ended";
+  $("run-code").disabled = status !== "active";
+  $("submit-code").disabled = status !== "active";
+  updateEnvironment();
 }
 
 async function api(path, body) {
-  const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store",
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (state.status === "active" && path !== "/api/events") recordEvent("fetch_failure", { operation: apiOperation(path) });
+    throw error;
+  }
   if (!response.ok) {
+    if (state.status === "active" && path !== "/api/events") recordEvent("fetch_failure", { operation: apiOperation(path) });
     let detail = `${response.status} ${response.statusText}`;
     try { detail = (await response.json()).detail || detail; } catch { /* A non-JSON error is still shown. */ }
     throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   return response.json();
+}
+
+function apiOperation(path) {
+  if (path.includes("heartbeat")) return "heartbeat";
+  if (path.includes("submission")) return "submission";
+  if (path.includes("marker")) return "marker";
+  if (path.includes("session/end")) return "session_end";
+  return "session_request";
 }
 
 function snapshot() {
@@ -138,6 +172,12 @@ function eventDescription(type, payload = {}) {
   if (type === "fullscreenchange") return payload.fullscreen ? "entered page fullscreen" : "exited page fullscreen";
   if (["copy", "paste", "cut"].includes(type)) return `${metadata.character_count ?? 0} characters`;
   if (type === "keydown") return `${metadata.keyCategory || "other"} key category`;
+  if (type === "editor_change") return `${metadata.change_size || "SMALL_CHANGE"} · length ${metadata.old_length ?? 0} → ${metadata.new_length ?? 0}`;
+  if (type === "domcontentloaded") return "document content loaded before test start";
+  if (type === "fullscreen_error") return "page fullscreen request failed";
+  if (type === "online") return "browser reported online";
+  if (type === "offline") return "browser reported offline";
+  if (type === "fetch_failure") return `${metadata.operation || "request"} request failed`;
   if (type === "marker") return payload.label || "test marker";
   if (type === "heartbeat") return `${Math.round(payload.delta_ms ?? 0)} ms interval${payload.gap_level ? ` · ${payload.gap_level}` : ""}`;
   if (type === "contextmenu") return "context menu requested";
@@ -156,6 +196,7 @@ function appendLive(type, payload = {}) {
   list.querySelector(".empty-state")?.remove();
   const item = document.createElement("li");
   item.className = `event-${eventCategory(type)}`;
+  item.dataset.category = eventCategory(type);
   if (type === "heartbeat") {
     if (payload.gap_level === "WARNING") item.classList.add("event-warning");
     if (payload.gap_level === "LARGE GAP") item.classList.add("event-large");
@@ -171,9 +212,24 @@ function appendLive(type, payload = {}) {
   description.textContent = eventDescription(type, payload);
   item.append(time, label, description);
   list.prepend(item);
+  applyEventFilter();
   while (list.children.length > 150) list.lastElementChild.remove();
   state.eventCount += 1;
   $("event-total").textContent = `${state.eventCount} events`;
+  if (type === "heartbeat" && ["WARNING", "LARGE GAP"].includes(payload.gap_level)) {
+    state.warningCount += 1;
+    $("warning-count").textContent = state.warningCount;
+    const warningList = $("warning-list");
+    if (state.warningCount === 1) warningList.replaceChildren();
+    const warning = document.createElement("li");
+    warning.textContent = `${formatClock(payload.server_timestamp)} · ${payload.gap_level}: ${Math.round(payload.delta_ms)} ms`;
+    warningList.prepend(warning);
+  }
+}
+
+function applyEventFilter() {
+  const filter = $("event-filter").value;
+  for (const item of $("event-list").children) item.hidden = filter !== "all" && item.dataset.category !== filter;
 }
 
 function sendUnloadEvent(payload) {
@@ -182,13 +238,15 @@ function sendUnloadEvent(payload) {
   fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), keepalive: true }).catch(() => {});
 }
 
-function recordEvent(eventType, metadata = {}, unload = false) {
+function recordEvent(eventType, metadata = {}, unload = false, observedAt = null) {
   if (state.status !== "active") return;
   const payload = {
     event_id: crypto.randomUUID(),
     session_id: state.id,
     event_type: eventType,
-    timestamp_client: new Date().toISOString(),
+    sequence: ++state.eventSequence,
+    performance_ms: observedAt?.performance_ms ?? performance.now(),
+    timestamp_client: observedAt?.timestamp_client ?? new Date(Date.now()).toISOString(),
     ...snapshot(),
     metadata,
   };
@@ -223,6 +281,14 @@ function clipboardCharacterCount(event) {
 }
 
 function installEventListeners() {
+  document.addEventListener("DOMContentLoaded", () => {
+    state.domContentLoaded = { timestamp_client: new Date(Date.now()).toISOString(), performance_ms: performance.now() };
+  }, { once: true });
+  if (document.readyState !== "loading") {
+    const navigation = performance.getEntriesByType("navigation")[0];
+    const ms = navigation?.domContentLoadedEventEnd || performance.now();
+    state.domContentLoaded = { timestamp_client: new Date(performance.timeOrigin + ms).toISOString(), performance_ms: ms };
+  }
   document.addEventListener("visibilitychange", () => recordEvent("visibilitychange"));
   window.addEventListener("blur", () => recordEvent("blur"));
   window.addEventListener("focus", () => recordEvent("focus"));
@@ -244,6 +310,8 @@ function installEventListeners() {
   }));
   document.addEventListener("pointerleave", () => recordEvent("pointerleave"));
   document.addEventListener("pointerenter", () => recordEvent("pointerenter"));
+  window.addEventListener("online", () => recordEvent("online"));
+  window.addEventListener("offline", () => recordEvent("offline"));
   window.addEventListener("resize", updateEnvironment);
 }
 
@@ -255,6 +323,7 @@ async function sendHeartbeat() {
       session_id: state.id,
       sequence: ++state.heartbeatSequence,
       client_timestamp: new Date().toISOString(),
+      performance_ms: performance.now(),
       visibility_state: document.visibilityState,
       has_focus: document.hasFocus(),
       fullscreen: Boolean(document.fullscreenElement),
@@ -284,6 +353,13 @@ async function startTest() {
       platform: currentPlatform(),
       screen_width: screen.width,
       screen_height: screen.height,
+      language: currentLanguage,
+      hardware_concurrency: navigator.hardwareConcurrency || null,
+      device_memory: navigator.deviceMemory || null,
+      viewport_width: window.innerWidth,
+      viewport_height: window.innerHeight,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown",
+      duration_minutes: state.durationMinutes,
     });
     state.id = result.id;
     state.startedAt = result.started_at;
@@ -291,6 +367,7 @@ async function startTest() {
     updateElapsed();
     setStatus("active");
     setMessage("Recording page events and sending a heartbeat every two seconds.");
+    if (state.domContentLoaded) recordEvent("domcontentloaded", {}, false, state.domContentLoaded);
     await sendHeartbeat();
     if (state.status === "active") {
       state.heartbeatTimer = window.setInterval(sendHeartbeat, 2000);

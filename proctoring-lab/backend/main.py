@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import csv
+import io
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .analysis import analyze_session, build_timeline
 from .database import PROJECT_ROOT, connection, initialize_database
-from .models import EventIn, HeartbeatIn, MarkerIn, SessionEnd, SessionStart
+from .models import EventIn, HeartbeatIn, MarkerIn, SessionEnd, SessionStart, SubmissionIn
 from .report import render_report
 
 
@@ -73,6 +75,14 @@ def index():
     return FileResponse(path)
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    path = FRONTEND / "favicon.svg"
+    if not path.is_file():
+        return Response(status_code=204)
+    return FileResponse(path, media_type="image/svg+xml")
+
+
 app.mount("/static", StaticFiles(directory=str(FRONTEND), check_dir=False), name="static")
 
 
@@ -96,11 +106,22 @@ def start_session(payload: SessionStart):
         "platform": payload.platform,
         "screen_width": payload.screen_width,
         "screen_height": payload.screen_height,
+        "viewport_width": payload.viewport_width,
+        "viewport_height": payload.viewport_height,
+        "language": payload.language,
+        "hardware_concurrency": payload.hardware_concurrency,
+        "device_memory": payload.device_memory,
+        "timezone": payload.timezone,
+        "duration_minutes": payload.duration_minutes,
     }
     with connection() as db:
         try:
             db.execute(
-                "INSERT INTO sessions VALUES (:id,:started_at,:ended_at,:user_agent,:platform,:screen_width,:screen_height)",
+                """INSERT INTO sessions
+                (id,started_at,ended_at,user_agent,platform,screen_width,screen_height,
+                viewport_width,viewport_height,language,hardware_concurrency,device_memory,timezone,duration_minutes)
+                VALUES (:id,:started_at,:ended_at,:user_agent,:platform,:screen_width,:screen_height,
+                :viewport_width,:viewport_height,:language,:hardware_concurrency,:device_memory,:timezone,:duration_minutes)""",
                 session,
             )
         except sqlite3.IntegrityError as exc:
@@ -137,6 +158,19 @@ def record_event(payload: EventIn):
         count = metadata.get("character_count", 0)
         if isinstance(count, bool) or not isinstance(count, int) or count < 0 or count > 10_000_000:
             raise HTTPException(422, "Invalid clipboard character count")
+    elif payload.event_type == "editor_change":
+        if metadata.keys() != {"old_length", "new_length", "delta_length", "change_size"}:
+            raise HTTPException(422, "Editor metadata must contain only length changes and classification")
+        old, new, delta = (metadata[name] for name in ("old_length", "new_length", "delta_length"))
+        if any(type(value) is not int for value in (old, new, delta)) or not (0 <= old <= 1_000_000 and 0 <= new <= 1_000_000) or delta != new - old:
+            raise HTTPException(422, "Invalid editor length change")
+        expected = "SMALL_CHANGE" if abs(delta) < 30 else "MEDIUM_CHANGE" if abs(delta) <= 150 else "LARGE_CHANGE"
+        if metadata["change_size"] != expected:
+            raise HTTPException(422, "Invalid editor change classification")
+    elif payload.event_type == "fetch_failure":
+        operation = metadata.get("operation")
+        if metadata.keys() != {"operation"} or not isinstance(operation, str) or len(operation) > 50 or not operation.replace("_", "").isalnum():
+            raise HTTPException(422, "Fetch failure metadata may contain only a short operation label")
     elif metadata:
         # Browser state is stored in dedicated columns, not opaque telemetry.
         raise HTTPException(422, "Metadata is not accepted for this event type")
@@ -144,6 +178,8 @@ def record_event(payload: EventIn):
         "event_id": str(payload.event_id),
         "session_id": str(payload.session_id),
         "event_type": payload.event_type,
+        "sequence": payload.sequence,
+        "performance_ms": payload.performance_ms,
         "timestamp_client": utc_text(payload.timestamp_client),
         "timestamp_server": utc_now(),
         "visibility_state": payload.visibility_state,
@@ -160,7 +196,11 @@ def record_event(payload: EventIn):
         require_active(db, payload.session_id)
         try:
             db.execute(
-                """INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                """INSERT INTO events
+                (id,session_id,event_type,client_timestamp,server_timestamp,visibility_state,
+                document_has_focus,fullscreen,screen_width,screen_height,viewport_width,
+                viewport_height,user_agent,metadata_json,sequence,performance_ms)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     event["event_id"], event["session_id"], event["event_type"],
                     event["timestamp_client"], event["timestamp_server"],
@@ -168,6 +208,7 @@ def record_event(payload: EventIn):
                     int(event["fullscreen"]), event["screen_width"], event["screen_height"],
                     event["viewport_width"], event["viewport_height"], event["user_agent"],
                     json.dumps(metadata, separators=(",", ":")),
+                    event["sequence"], event["performance_ms"],
                 ),
             )
         except sqlite3.IntegrityError as exc:
@@ -184,6 +225,7 @@ def record_heartbeat(payload: HeartbeatIn):
         "sequence": payload.sequence,
         "client_timestamp": utc_text(payload.client_timestamp),
         "server_timestamp": now,
+        "performance_ms": payload.performance_ms,
         "delta_ms": None,
         "gap_level": "FIRST",
         "visibility_state": payload.visibility_state,
@@ -202,12 +244,16 @@ def record_heartbeat(payload: HeartbeatIn):
             heartbeat["gap_level"] = "NORMAL" if delta < 4000 else "WARNING" if delta <= 8000 else "LARGE GAP"
         try:
             db.execute(
-                "INSERT INTO heartbeats VALUES (?,?,?,?,?,?,?,?,?,?)",
+                """INSERT INTO heartbeats
+                (id,session_id,sequence,client_timestamp,server_timestamp,delta_ms,gap_level,
+                visibility_state,has_focus,fullscreen,performance_ms)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     heartbeat["id"], heartbeat["session_id"], heartbeat["sequence"],
                     heartbeat["client_timestamp"], heartbeat["server_timestamp"],
                     heartbeat["delta_ms"], heartbeat["gap_level"], heartbeat["visibility_state"],
                     int(heartbeat["has_focus"]), int(heartbeat["fullscreen"]),
+                    heartbeat["performance_ms"],
                 ),
             )
         except sqlite3.IntegrityError as exc:
@@ -232,13 +278,60 @@ def record_marker(payload: MarkerIn):
     return marker
 
 
+MOCK_RESULTS = (
+    "Wrong Answer", "Accepted", "Compilation Error", "Runtime Error", "Time Limit Exceeded"
+)
+MOCK_NOTE = "Mock result only; source code was not evaluated."
+
+
+@app.post("/api/submission", status_code=201)
+def record_submission(payload: SubmissionIn):
+    """Record a simulated judge result without receiving source or input contents."""
+    with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
+        require_active(db, payload.session_id)
+        number = db.execute(
+            "SELECT COALESCE(MAX(submission_number), 0) + 1 FROM submissions WHERE session_id=?",
+            (str(payload.session_id),),
+        ).fetchone()[0]
+        submission = {
+            "id": str(uuid4()), "session_id": str(payload.session_id),
+            "submission_number": number, "question_id": payload.question_id,
+            "language": payload.language, "action": payload.action,
+            "code_length": payload.code_length,
+            "result": MOCK_RESULTS[(number - 1) % len(MOCK_RESULTS)],
+            "timestamp_client": utc_text(payload.timestamp_client),
+            "timestamp_server": utc_now(),
+        }
+        db.execute(
+            """INSERT INTO submissions
+            (id,session_id,submission_number,question_id,language,action,code_length,
+            result,client_timestamp,server_timestamp)
+            VALUES (:id,:session_id,:submission_number,:question_id,:language,:action,
+            :code_length,:result,:timestamp_client,:timestamp_server)""",
+            submission,
+        )
+    return {**submission, "mocked": True, "evaluation_note": MOCK_NOTE}
+
+
+@app.get("/api/session/{session_id}/submissions")
+def read_submissions(session_id: UUID):
+    with connection() as db:
+        get_session(db, session_id)
+        items = [dict(row) for row in db.execute(
+            "SELECT * FROM submissions WHERE session_id=? ORDER BY submission_number",
+            (str(session_id),),
+        )]
+    return {"session_id": str(session_id), "items": [{**item, "mocked": True} for item in items]}
+
+
 @app.get("/api/session/{session_id}")
 def read_session(session_id: UUID):
     with connection() as db:
         session = get_session(db, session_id)
         counts = {
             table: db.execute(f"SELECT COUNT(*) FROM {table} WHERE session_id=?", (str(session_id),)).fetchone()[0]
-            for table in ("events", "heartbeats", "markers")
+            for table in ("events", "heartbeats", "markers", "submissions")
         }
     return {**session, "counts": counts}
 
@@ -267,3 +360,91 @@ def read_report(session_id: UUID):
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(report_html, encoding="utf-8")
     return HTMLResponse(report_html)
+
+
+def _export_rows(db: sqlite3.Connection, session_id: UUID) -> tuple[dict, dict[str, list[dict]]]:
+    session = get_session(db, session_id)
+    tables = {}
+    for table in ("events", "heartbeats", "markers", "submissions"):
+        tables[table] = [dict(row) for row in db.execute(
+            f"SELECT * FROM {table} WHERE session_id=? ORDER BY server_timestamp, rowid",
+            (str(session_id),),
+        )]
+    return session, tables
+
+
+@app.get("/api/session/{session_id}/export/json")
+def export_json(session_id: UUID):
+    with connection() as db:
+        session, tables = _export_rows(db, session_id)
+    for event in tables["events"]:
+        event["metadata"] = json.loads(event.pop("metadata_json"))
+    filename = f"session_{session_id}_events.json"
+    return Response(
+        json.dumps({"session": session, **tables}, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _csv_safe(value: object) -> object:
+    """Prevent untrusted labels or environment strings becoming spreadsheet formulas."""
+    if value is None:
+        return ""
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
+
+
+@app.get("/api/session/{session_id}/export/csv")
+def export_csv(session_id: UUID):
+    with connection() as db:
+        _, tables = _export_rows(db, session_id)
+    output = io.StringIO(newline="")
+    columns = (
+        "kind", "id", "session_id", "event_type", "sequence", "timestamp_client",
+        "timestamp_server", "performance_ms", "visibility_state", "has_focus",
+        "fullscreen", "metadata",
+    )
+    writer = csv.DictWriter(output, fieldnames=columns, lineterminator="\n")
+    writer.writeheader()
+    rows: list[dict] = []
+    for event in tables["events"]:
+        rows.append({
+            "kind": "EVENT", "id": event["id"], "session_id": event["session_id"],
+            "event_type": event["event_type"], "sequence": event["sequence"],
+            "timestamp_client": event["client_timestamp"], "timestamp_server": event["server_timestamp"],
+            "performance_ms": event["performance_ms"], "visibility_state": event["visibility_state"],
+            "has_focus": bool(event["document_has_focus"]), "fullscreen": bool(event["fullscreen"]),
+            "metadata": event["metadata_json"],
+        })
+    for heartbeat in tables["heartbeats"]:
+        rows.append({
+            "kind": "HEARTBEAT", "id": heartbeat["id"], "session_id": heartbeat["session_id"],
+            "event_type": "heartbeat", "sequence": heartbeat["sequence"],
+            "timestamp_client": heartbeat["client_timestamp"], "timestamp_server": heartbeat["server_timestamp"],
+            "performance_ms": heartbeat["performance_ms"], "visibility_state": heartbeat["visibility_state"],
+            "has_focus": bool(heartbeat["has_focus"]), "fullscreen": bool(heartbeat["fullscreen"]),
+            "metadata": json.dumps({"delta_ms": heartbeat["delta_ms"], "gap_level": heartbeat["gap_level"]}),
+        })
+    for marker in tables["markers"]:
+        rows.append({
+            "kind": "MARKER", "id": marker["id"], "session_id": marker["session_id"],
+            "event_type": "marker", "timestamp_client": marker["client_timestamp"],
+            "timestamp_server": marker["server_timestamp"], "metadata": json.dumps({"label": marker["label"]}),
+        })
+    for submission in tables["submissions"]:
+        rows.append({
+            "kind": "SUBMISSION", "id": submission["id"], "session_id": submission["session_id"],
+            "event_type": submission["action"], "sequence": submission["submission_number"],
+            "timestamp_client": submission["client_timestamp"],
+            "timestamp_server": submission["server_timestamp"],
+            "metadata": json.dumps({key: submission[key] for key in ("question_id", "language", "code_length", "result")}),
+        })
+    for row in sorted(rows, key=lambda item: (item["timestamp_server"], item["kind"], item["id"])):
+        writer.writerow({column: _csv_safe(row.get(column)) for column in columns})
+    filename = f"session_{session_id}_events.csv"
+    return Response(
+        output.getvalue(), media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

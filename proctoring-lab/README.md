@@ -1,8 +1,10 @@
 # PROCTORING-LAB
 
-**A local-only, educational browser telemetry experiment.** The included page is a generic mock coding assessment about summing integers. It records what its own JavaScript page can observe while you change tabs, focus, fullscreen state, clipboard actions, or the surrounding desktop/VM environment. It does not connect to a coding platform or a real assessment.
+**A local-only, educational browser telemetry experiment.** The included page is a generic three-question coding assessment covering array maximum, balanced parentheses, and binary search. It records what its own JavaScript page can observe while you change tabs, focus, fullscreen state, clipboard actions, or the surrounding desktop/VM environment. It does not connect to a coding platform or a real assessment.
 
-The page displays **PROCTORING SIMULATION — LOCAL TEST ENVIRONMENT**. Run and Submit are simulation controls, not a remote judge. This project does not grade code.
+The page displays **PROCTORING SIMULATION — LOCAL TEST ENVIRONMENT**. Run and Submit record mock submissions; they do not execute or grade code, and source code stays in the browser tab.
+
+> This project is a browser-security simulation inspired by common online coding assessment patterns. It is not affiliated with CodeChef and does not claim to reproduce CodeChef's internal implementation.
 
 > Do not use this project to interfere with or evade monitoring on an actual examination platform. Conduct experiments only against the included local simulation.
 
@@ -24,7 +26,7 @@ JavaScript assessment page
 
 JavaScript inside a guest browser normally receives browser/guest-level signals. It does not automatically receive arbitrary host-OS state. Actual behavior can vary with the browser, guest and host operating systems, VM configuration, power management, and whether a window is minimized or merely unfocused. **Measure each configuration; do not treat one result as universal.**
 
-The page records `visibilitychange`, window `blur`/`focus`, `fullscreenchange`, `beforeunload`, `pagehide`/`pageshow`, `copy`/`paste`/`cut`, `contextmenu`, `keydown`, and `pointerleave`/`pointerenter`. Keyboard records contain only categories and modifier flags, never typed characters. Clipboard records contain only the action and a character count where the browser exposes one, never clipboard content. A two-second heartbeat captures visibility, focus, and fullscreen snapshots and allows interval analysis. Browser throttling, suspension, server delay, and scheduling can all affect those intervals. A gap does **not** prove misconduct.
+The page records `visibilitychange`, window `blur`/`focus`, `fullscreenchange`, `beforeunload`, `pagehide`/`pageshow`, `DOMContentLoaded`, `copy`/`paste`/`cut`, `contextmenu`, `keydown`, `pointerleave`/`pointerenter`, `online`/`offline`, fullscreen errors, failed local requests, and editor length changes. Each event can carry a client sequence, `performance.now()`, wall-clock time, server receipt time, and a visibility/focus/fullscreen snapshot. Keyboard records contain only categories and modifier flags, never typed characters. Clipboard records contain only the action and a safely measured length, never clipboard content. Editor analytics store old/new lengths and a size category, never source text. A two-second heartbeat captures visibility, focus, and fullscreen snapshots and allows interval analysis. Browser throttling, suspension, server delay, and scheduling can all affect those intervals. A gap does **not** prove misconduct.
 
 The lab does not use a webcam, microphone, screenshots, global keyboard hooks, clipboard readers, process inspection, Safe Exam Browser integration, third-party scripts, or telemetry spoofing. Its application API and page are bound to `127.0.0.1`; runtime requests stay on the same local server. Package installation during setup may require access to a package index.
 
