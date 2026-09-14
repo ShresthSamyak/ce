@@ -6,6 +6,7 @@ const state = {
   status: "idle",
   startedAt: null,
   heartbeatTimer: null,
+  elapsedTimer: null,
   heartbeatInFlight: false,
   heartbeatSequence: 0,
   eventCount: 0,
@@ -44,6 +45,11 @@ function updateEnvironment() {
   $("platform-name").textContent = currentPlatform();
   $("viewport-size").textContent = `${window.innerWidth} × ${window.innerHeight}`;
   $("screen-size").textContent = `${screen.width} × ${screen.height}`;
+}
+
+function updateElapsed() {
+  const seconds = state.startedAt ? Math.max(0, Math.floor((Date.now() - new Date(state.startedAt).getTime()) / 1000)) : 0;
+  $("elapsed-time").textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 function formatDateTime(value) {
@@ -206,7 +212,7 @@ function installEventListeners() {
   document.addEventListener("fullscreenchange", () => recordEvent("fullscreenchange"));
   window.addEventListener("beforeunload", () => recordEvent("beforeunload", {}, true));
   window.addEventListener("pagehide", () => recordEvent("pagehide", {}, true));
-  window.addEventListener("pageshow", (event) => recordEvent("pageshow", { persisted: event.persisted }));
+  window.addEventListener("pageshow", () => recordEvent("pageshow"));
   for (const type of ["copy", "paste", "cut"]) {
     document.addEventListener(type, (event) => recordEvent(type, { character_count: clipboardCharacterCount(event) }));
   }
@@ -262,10 +268,12 @@ async function startTest() {
     state.id = result.id;
     state.startedAt = result.started_at;
     updateEnvironment();
+    updateElapsed();
     setStatus("active");
     setMessage("Recording page events and sending a heartbeat every two seconds.");
     await sendHeartbeat();
     state.heartbeatTimer = window.setInterval(sendHeartbeat, 2000);
+    state.elapsedTimer = window.setInterval(updateElapsed, 1000);
   } catch (error) {
     setStatus("idle");
     setMessage(`Could not start session: ${error.message}`, true);
@@ -276,6 +284,8 @@ async function endTest() {
   if (state.status !== "active") return;
   setStatus("ending");
   window.clearInterval(state.heartbeatTimer);
+  window.clearInterval(state.elapsedTimer);
+  updateElapsed();
   setMessage("Saving and analyzing the session…");
   try {
     await api("/api/session/end", { session_id: state.id });
@@ -339,7 +349,7 @@ function valueFrom(object, ...keys) {
 function renderSummary(analysis) {
   const summary = analysis.summary || analysis;
   const cards = [
-    ["Duration", `${Number(valueFrom(summary, "duration_seconds", "total_duration_seconds") || 0).toFixed(1)} s`],
+    ["Duration", `${Number(valueFrom(summary, "duration_seconds", "total_duration_seconds") ?? Number(valueFrom(summary, "total_duration_ms") || 0) / 1000).toFixed(1)} s`],
     ["Focus losses", valueFrom(summary, "focus_loss_count") ?? 0],
     ["Visibility hidden", valueFrom(summary, "visibility_hidden_count") ?? 0],
     ["Fullscreen exits", valueFrom(summary, "fullscreen_exit_count") ?? 0],
@@ -367,9 +377,10 @@ function timelineTime(item) {
 }
 
 function timelineType(item) {
-  if (item.kind === "marker") return "marker";
-  if (item.kind === "heartbeat") return "heartbeat";
-  return item.event_type || item.kind || "event";
+  const kind = String(item.kind || "").toLowerCase();
+  if (kind === "marker") return "marker";
+  if (kind === "heartbeat") return "heartbeat";
+  return item.event_type || kind || "event";
 }
 
 function renderTimeline(items) {
@@ -420,7 +431,7 @@ function svgNode(tag, attributes = {}, text = null) {
 function renderHeartbeatGraph(points) {
   const wrap = $("heartbeat-graph");
   wrap.replaceChildren();
-  const intervals = points.filter((point) => Number.isFinite(Number(point.delta_ms)));
+  const intervals = points.filter((point) => point.delta_ms !== null && point.delta_ms !== undefined && Number.isFinite(Number(point.delta_ms)));
   if (!intervals.length) {
     const empty = document.createElement("p");
     empty.className = "graph-empty";
@@ -520,6 +531,12 @@ function init() {
   $("marker-form").addEventListener("submit", saveMarker);
   $("experiment-select").addEventListener("change", renderExperiment);
   $("view-report").addEventListener("click", () => window.open(`/api/session/${encodeURIComponent(state.id)}/report`, "_blank", "noopener"));
+  $("toggle-fullscreen").addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (error) { setMessage(`Page fullscreen request failed: ${error.message}`, true); }
+  });
   for (const id of ["run-code", "submit-code"]) {
     $(id).addEventListener("click", () => { $("editor-result").textContent = `${id === "run-code" ? "Run" : "Submit"} is simulated. Code was not executed or sent.`; });
   }

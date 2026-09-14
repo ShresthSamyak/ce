@@ -56,17 +56,10 @@ async def restrict_api_payload(request: Request, call_next):
         length = request.headers.get("content-length")
         if length is not None and (not length.isdecimal() or int(length) > 8192):
             return JSONResponse({"detail": "Request body exceeds 8192 bytes"}, status_code=413)
-        # A bounded read also covers clients that omit Content-Length.
-        chunks = bytearray()
-        async for chunk in request.stream():
-            chunks.extend(chunk)
-            if len(chunks) > 8192:
-                return JSONResponse({"detail": "Request body exceeds 8192 bytes"}, status_code=413)
-
-        async def receive():
-            return {"type": "http.request", "body": bytes(chunks), "more_body": False}
-
-        request._receive = receive
+        # Starlette caches this body for downstream parsing; the size check also
+        # covers clients that omit Content-Length.
+        if len(await request.body()) > 8192:
+            return JSONResponse({"detail": "Request body exceeds 8192 bytes"}, status_code=413)
     return await call_next(request)
 
 
