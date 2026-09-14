@@ -36,6 +36,7 @@ const starterCode = {
 const editorDrafts = {};
 let currentLanguage = "Python 3";
 let mockSubmissionCount = 0;
+let customInputDraft = "";
 
 function browserName() {
   const ua = navigator.userAgent;
@@ -577,6 +578,8 @@ function switchLanguage() {
 }
 
 function setInputMode(mode) {
+  const wasCustom = $("use-custom").getAttribute("aria-pressed") === "true";
+  if (wasCustom) customInputDraft = $("custom-input").value;
   const sample = mode === "sample";
   $("use-sample").classList.toggle("is-selected", sample);
   $("use-custom").classList.toggle("is-selected", !sample);
@@ -584,7 +587,7 @@ function setInputMode(mode) {
   $("use-custom").setAttribute("aria-pressed", String(!sample));
   $("custom-input").readOnly = sample;
   if (sample) $("custom-input").value = $("sample-input").textContent.trim();
-  else { $("custom-input").value = ""; $("custom-input").focus(); }
+  else { $("custom-input").value = customInputDraft; $("custom-input").focus(); }
   $("expected-output").textContent = sample ? "13" : "Not computed for custom input.";
 }
 
