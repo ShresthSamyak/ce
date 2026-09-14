@@ -27,6 +27,16 @@ const experimentTemplates = {
   i: { title: "I · Switch host application", steps: ["Inside the guest VM, start the session and leave the guest browser open.", "On the host OS, switch to another host application without automating the guest.", "Return to VMware.", "Add a marker labeled “Host application switch”."], marker: "Host application switch" },
 };
 
+const starterCode = {
+  "Python 3": "# Write your solution here.\n# This local lab does not execute or grade code.\n",
+  JavaScript: "// Write your solution here.\n// This local lab does not execute or grade code.\n",
+  "C++": "// Write your solution here.\n// This local lab does not execute or grade code.\n",
+  Java: "// Write your solution here.\n// This local lab does not execute or grade code.\n",
+};
+const editorDrafts = {};
+let currentLanguage = "Python 3";
+let mockSubmissionCount = 0;
+
 function browserName() {
   const ua = navigator.userAgent;
   if (ua.includes("Edg/")) return "Microsoft Edge";
@@ -550,10 +560,90 @@ function renderAnalysis(analysis) {
   renderMatrix(analysis.detection_matrix || []);
 }
 
+function updateCursorPosition() {
+  const editor = $("code-editor");
+  const beforeCursor = editor.value.slice(0, editor.selectionStart);
+  const lines = beforeCursor.split("\n");
+  $("cursor-position").textContent = `Ln ${lines.length}, Col ${lines[lines.length - 1].length + 1}`;
+}
+
+function switchLanguage() {
+  const nextLanguage = $("language").value;
+  editorDrafts[currentLanguage] = $("code-editor").value;
+  currentLanguage = nextLanguage;
+  $("code-editor").value = editorDrafts[nextLanguage] ?? starterCode[nextLanguage];
+  $("editor-extension").textContent = { "Python 3": "py", JavaScript: "js", "C++": "cpp", Java: "java" }[nextLanguage];
+  updateCursorPosition();
+}
+
+function setInputMode(mode) {
+  const sample = mode === "sample";
+  $("use-sample").classList.toggle("is-selected", sample);
+  $("use-custom").classList.toggle("is-selected", !sample);
+  $("use-sample").setAttribute("aria-pressed", String(sample));
+  $("use-custom").setAttribute("aria-pressed", String(!sample));
+  $("custom-input").readOnly = sample;
+  if (sample) $("custom-input").value = $("sample-input").textContent.trim();
+  else { $("custom-input").value = ""; $("custom-input").focus(); }
+  $("expected-output").textContent = sample ? "13" : "Not computed for custom input.";
+}
+
+function simulateAssessmentAction(action) {
+  const isSubmission = action === "Submit";
+  if (isSubmission) {
+    mockSubmissionCount += 1;
+    $("submission-count").textContent = `Mock submissions this visit: ${mockSubmissionCount}`;
+    $("problem-state").textContent = `Mock submitted ${mockSubmissionCount} time${mockSubmissionCount === 1 ? "" : "s"}`;
+  }
+  $("result-state").textContent = isSubmission ? "Mock submitted" : "Simulation only";
+  $("result-state").classList.add("is-simulated");
+  $("editor-result").textContent = isSubmission
+    ? "Mock submission recorded in this browser tab. No source code was sent, executed, graded, or saved."
+    : "Run requested. This safe simulation does not execute code, so it cannot produce a program output or verdict.";
+  $("program-output").textContent = "Not available — code execution is disabled.";
+  $("result-heading").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function initEditor() {
+  const editor = $("code-editor");
+  editorDrafts[currentLanguage] = editor.value;
+  for (const type of ["input", "keyup", "click", "select"]) editor.addEventListener(type, updateCursorPosition);
+  editor.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey) return;
+    event.preventDefault();
+    const start = editor.selectionStart, end = editor.selectionEnd;
+    editor.setRangeText("    ", start, end, "end");
+    updateCursorPosition();
+  });
+  $("language").addEventListener("change", switchLanguage);
+  $("font-size").addEventListener("change", () => { editor.style.fontSize = `${$("font-size").value}px`; });
+  $("reset-code").addEventListener("click", () => {
+    if (!window.confirm("Replace the current draft with the starter comment?")) return;
+    editor.value = starterCode[currentLanguage];
+    editorDrafts[currentLanguage] = editor.value;
+    editor.focus();
+    updateCursorPosition();
+  });
+  $("use-sample").addEventListener("click", () => setInputMode("sample"));
+  $("use-custom").addEventListener("click", () => setInputMode("custom"));
+  $("copy-sample").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("sample-input").textContent.trim());
+      $("editor-result").textContent = "Sample copied. Programmatic clipboard writes may not produce a browser copy event; use Ctrl+C to test that signal.";
+    } catch (error) {
+      $("editor-result").textContent = `Sample could not be copied: ${error.message}`;
+    }
+  });
+  $("run-code").addEventListener("click", () => simulateAssessmentAction("Run"));
+  $("submit-code").addEventListener("click", () => simulateAssessmentAction("Submit"));
+  updateCursorPosition();
+}
+
 function init() {
   updateEnvironment();
   renderExperiment();
   installEventListeners();
+  initEditor();
   $("start-test").addEventListener("click", startTest);
   $("end-test").addEventListener("click", endTest);
   $("add-marker").addEventListener("click", showMarkerDialog);
@@ -567,9 +657,6 @@ function init() {
       else await document.documentElement.requestFullscreen();
     } catch (error) { setMessage(`Page fullscreen request failed: ${error.message}`, true); }
   });
-  for (const id of ["run-code", "submit-code"]) {
-    $(id).addEventListener("click", () => { $("editor-result").textContent = `${id === "run-code" ? "Run" : "Submit"} is simulated. Code was not executed or sent.`; });
-  }
 }
 
 init();
