@@ -220,7 +220,7 @@ def render_report(data: dict[str, Any]) -> str:
                 " (" + signal["visibility_state"] + ")" if signal["event_type"] == "visibilitychange" else ""
             )
             for signal in entry["signals"]
-        ) or "No listed browser signal observed in ±3 s"
+        ) or "No listed transition or heartbeat anomaly observed in ±3 s"
         gap = observed["heartbeat_gap_ms"]
         snapshot = observed["browser_state_snapshot"]
         state_text = (
@@ -249,6 +249,13 @@ def render_report(data: dict[str, Any]) -> str:
             item["question_id"], item["language"], item["action"],
             item["code_length"], item["result"],
         ] for item in data["submissions"]
+    ]
+    activity_rows = [
+        [_time(item["timestamp_server"]), item["event_type"], _description(item)]
+        for item in data["timeline"]
+        if item["kind"] == "EVENT" and item["event_type"] in {
+            "online", "offline", "fetch_failure", "copy", "paste", "cut", "editor_change"
+        }
     ]
     distribution = summary["editor_change_distribution"]
     avg = summary["average_heartbeat_interval_ms"]
@@ -307,10 +314,10 @@ svg text{{fill:#435669}}.hb-normal{{fill:#147475}}.hb-warning{{fill:#a77718}}.hb
 <section><h2>Event counts</h2>{_table(["Event", "Count"], event_rows, "No browser events recorded.")}</section>
 <section><h2>Focus, visibility and fullscreen statistics</h2>
 <p>Focus losses: {summary["focus_loss_count"]} · Hidden transitions: {summary["visibility_hidden_count"]} · Fullscreen exits: {summary["fullscreen_exit_count"]} · Fullscreen request errors: {summary["fullscreen_error_count"]}.</p>
-<p class="muted">Bands are reconstructed from received state snapshots. Gray means no snapshot was available yet. Receive time may differ from the action time.</p>
+<p class="muted">Bands carry each received state snapshot forward until the next one. This is a display convention, not proof that the state persisted continuously. Gray means no snapshot was available yet. Receive time may differ from action time.</p>
 {_state_bands(data, start, end)}
 <p class="muted">Green: visible / focused / fullscreen active. Red: hidden / unfocused / fullscreen inactive. Gray: unknown. Hover over each segment for its state label.</p></section>
-<section><h2>Visual event timeline</h2><p class="muted">Dots and rows use server receipt time; event rows also show browser performance time and sequence when available.</p>
+<section><h2>Visual event timeline</h2><p class="muted">{h(data["timeline_ordering_note"])} Dots and rows use server receipt time; event rows also show browser performance time and sequence when available.</p>
 <div class="track">{''.join(dots)}</div><p>Start {h(_time(session["started_at"]))} · End {h(_time(session["ended_at"])) if session["ended_at"] else "active"}</p>
 <div class="wide"><table><thead><tr><th>UTC time</th><th>Category</th><th>Observation</th></tr></thead><tbody>{timeline_body}</tbody></table></div></section>
 <section><h2>Heartbeat intervals</h2>
@@ -319,7 +326,8 @@ svg text{{fill:#435669}}.hb-normal{{fill:#147475}}.hb-warning{{fill:#a77718}}.hb
 {_heartbeat_chart(data["heartbeat_points"])}</section>
 <section><h2>Network, clipboard and editor changes</h2>
 <p>Network online/offline events: {summary["network_change_count"]} (offline: {summary["network_offline_count"]}); fetch failures: {summary["fetch_failure_count"]}; paste events: {summary["paste_count"]}.</p>
-<p>Editor changes: {summary["editor_change_count"]}; small: {distribution["SMALL_CHANGE"]}; medium: {distribution["MEDIUM_CHANGE"]}; large: {distribution["LARGE_CHANGE"]}. Change size is descriptive and does not imply misconduct.</p></section>
+<p>Editor changes: {summary["editor_change_count"]}; small: {distribution["SMALL_CHANGE"]}; medium: {distribution["MEDIUM_CHANGE"]}; large: {distribution["LARGE_CHANGE"]}. Change size is descriptive and does not imply misconduct. A failed fetch alone does not establish a network disconnection.</p>
+{_table(["UTC time", "Event", "Recorded metadata"], activity_rows, "No network, clipboard or editor-change events recorded.")}</section>
 <section><h2>Submission history</h2>
 <p class="muted">Results are local mock judge statuses; no submitted code is stored in this report.</p>
 {_table(["#", "UTC time", "Question", "Language", "Action", "Code length", "Mock result"], submissions, "No runs or submissions recorded.")}</section>

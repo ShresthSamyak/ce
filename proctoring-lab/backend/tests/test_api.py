@@ -140,7 +140,7 @@ def test_matrix_ignores_marker_typing_as_action_signal(client: TestClient):
         "timestamp_client": BASE.isoformat(),
     }).status_code == 201
     matrix = client.get(f"/api/session/{session_id}/analysis").json()["detection_matrix"]
-    assert matrix[0]["browser_observable"] == "no listed signal observed in ±3 s"
+    assert matrix[0]["browser_observable"] == "no listed transition or anomaly observed in ±3 s"
 
 
 def test_frontend_is_served(client: TestClient):

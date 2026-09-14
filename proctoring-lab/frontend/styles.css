@@ -59,3 +59,91 @@
 @media(max-width:1170px){.assessment-grid{grid-template-columns:minmax(175px,210px) minmax(0,1fr)}.editor-panel{grid-column:2}.problem-nav{grid-row:1 / span 2}.problem{min-height:0}}
 @media(max-width:800px){.assessment-grid{grid-template-columns:1fr}.problem-nav,.editor-panel{grid-column:auto;grid-row:auto}.problem-nav{position:static}.problem,.editor-panel{min-height:0}}
 @media(max-width:500px){.site-identity{align-items:flex-start}.brand-mark{width:34px;height:34px}.samples,.output-grid{grid-template-columns:1fr}.editor-panel>.section-heading,.editor-toolbar,.editor-status{flex-wrap:wrap}.editor-actions .muted{max-width:none}}
+
+/* Assessment controls and the intentionally separate local telemetry drawer. */
+.site-header{padding-top:.9rem;padding-bottom:.9rem}
+.site-header h1{font-size:1.1rem;margin:.15rem 0}
+.site-header .subheading{font-size:.8rem}
+main{max-width:1600px;gap:1rem;padding-top:1rem}
+.control-panel{padding:.9rem 1.1rem}
+.control-panel .section-heading{margin-bottom:.6rem}
+.control-panel .environment-grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:.5rem;margin-bottom:.8rem}
+.control-panel .environment-grid dt{font-size:.65rem}
+.control-panel .environment-grid dd{font-size:.73rem}
+.control-panel .app-message{margin:.55rem 0 0}
+.assessment-bar{position:sticky;top:0;z-index:10;flex-wrap:wrap;box-shadow:0 3px 11px #172b451c;padding:.55rem .8rem}
+.assessment-title{gap:.5rem}
+.assessment-title strong{font-size:.88rem}
+.assessment-tools{gap:.5rem}
+.assessment-tools .button{padding:.48rem .65rem;font-size:.72rem}
+.assessment-session{font-size:.7rem;color:#5a6879}
+.assessment-session strong{font-family:Consolas,monospace;color:#24374d}
+.question-tabs{display:flex;gap:.25rem;align-items:center}
+.question-tab{border:1px solid #d3dfeb;background:#f5f8fb;color:#435b75;border-radius:5px;padding:.45rem .8rem;font-size:.76rem;font-weight:850}
+.question-tab.is-current{background:#1d5f9d;border-color:#1d5f9d;color:#fff}
+.time-warning{color:#ab3c2c!important}
+.assessment-grid{grid-template-columns:minmax(170px,200px) minmax(330px,1fr) minmax(440px,1.24fr);gap:.85rem}
+.problem-nav-item{width:100%;text-align:left;background:#fff;border:1px solid transparent;margin:.25rem 0;cursor:pointer}
+.problem-nav-item:hover{background:#f3f7fb;border-color:#d5e1ed}
+.problem-nav-item.is-current{border-color:#f0d4a1;background:#fff9ed}
+.problem-index{background:#627c97}
+.is-current .problem-index{background:#e6a039}
+.problem-nav-item small{overflow-wrap:anywhere}
+.editor-actions .muted{max-width:55%}
+.history-title{margin:1rem 0 .35rem!important;font-size:.79rem!important;text-transform:uppercase;color:#61758b;border-top:1px solid #e2e8ef;padding-top:.7rem}
+.submission-history{margin:0;padding-left:1.3rem;max-height:155px;overflow:auto;color:#41546a;font-size:.74rem}
+.submission-history li{padding:.23rem 0}
+.telemetry-sidebar{position:fixed;right:0;top:0;bottom:0;z-index:31;width:min(380px,96vw);padding:1.1rem;background:#fff;border-left:1px solid #ced9e5;box-shadow:-10px 0 30px #14253d2a;transform:translateX(105%);transition:transform .2s ease;display:flex;flex-direction:column;gap:.45rem}
+.telemetry-sidebar.is-open{transform:translateX(0)}
+.telemetry-sidebar .section-heading{margin:0}
+.telemetry-sidebar .event-list{flex:1;max-height:none;margin:.35rem 0 0}
+.telemetry-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.3rem}
+.telemetry-stats div{background:#f2f6fa;border:1px solid #e2e9f0;border-radius:5px;padding:.35rem .5rem;min-width:0}
+.telemetry-stats span{display:block;color:#64778a;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800}
+.telemetry-stats strong{display:block;color:#29435d;font-size:.83rem;overflow-wrap:anywhere}
+.telemetry-sidebar .event-list li{display:grid;grid-template-columns:65px 82px 1fr;gap:.3rem;padding:.48rem;font-size:.73rem}
+.telemetry-sidebar .event-list li[hidden]{display:none}
+.telemetry-sidebar .event-label{min-width:0;font-size:.64rem}
+.telemetry-sidebar .event-list time{font-size:.66rem}
+.telemetry-controls{display:flex;align-items:center;gap:.5rem;font-size:.72rem}
+.telemetry-controls select{flex:1;min-width:0;border:1px solid #c5d3e1;border-radius:5px;padding:.35rem;background:white;color:#263b51}
+.telemetry-controls .counter{font-size:.65rem;padding:.25rem .4rem}
+.icon-button{border:0;background:#edf3f8;color:#324a64;border-radius:5px;width:30px;height:30px;font-size:1.2rem;line-height:1}
+.warning-panel{background:#fff8e9;border:1px solid #f0dfb7;border-radius:6px;padding:.55rem .7rem}
+.warning-panel h3{margin:0;font-size:.78rem}
+.warning-panel ol{margin:.35rem 0;padding-left:1.2rem;max-height:80px;overflow:auto;font-size:.72rem}
+.warning-panel p{margin:0;font-size:.68rem;color:#765d2c}
+.telemetry-backdrop{position:fixed;inset:0;background:#14253d55;z-index:30}
+.telemetry-backdrop[hidden]{display:none}
+#warning-count{display:inline-block;min-width:16px;margin-left:.25rem;padding:.1rem .3rem;border-radius:99px;background:#fff0d3;color:#875012}
+.event-network .event-label{color:#a4462e}
+.event-editor .event-label{color:#285f9c}
+.timeline-dot.event-network{background:#a4462e}
+.timeline-dot.event-editor{background:#285f9c}
+.observations-grid{grid-template-columns:minmax(0,3fr) minmax(280px,1fr)}
+.experiments{grid-column:1}
+.security-panel{grid-column:2;align-self:start}
+.security-panel summary{cursor:pointer;font-weight:800;color:#284766}
+.security-panel div{padding-top:1rem;font-size:.8rem}
+.security-panel p:last-child{margin-bottom:0}
+.experiment-controls{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.experiment-controls>label:first-child{margin:0}
+.vm-toggle{display:flex!important;align-items:center;gap:.35rem;font-size:.75rem!important;font-weight:700}
+.vm-toggle input{accent-color:#a96120}
+.marker-presets{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;border-top:1px solid #e4eaf1;padding-top:.65rem;font-size:.72rem;color:#566b80}
+.marker-presets button{border:1px solid #cbd7e3;border-radius:4px;background:#fff;padding:.28rem .45rem;color:#365775;font-size:.7rem;font-weight:700}
+.marker-presets button:hover{background:#ecf4fb}
+.session-options{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin:.25rem 0 .8rem;font-size:.75rem;color:#53677d}
+.session-options label{font-weight:800;color:#344e68}
+.session-options select,#marker-preset{border:1px solid #bfcfdf;border-radius:5px;background:#fff;color:#243d55;padding:.35rem .5rem;font-size:.77rem}
+#marker-preset{width:100%;margin-bottom:.8rem}
+.live-warning-banner{display:flex;align-items:center;justify-content:space-between;gap:1rem;background:#fff3dc;border:1px solid #e8c67e;border-left:4px solid #bc7223;border-radius:5px;padding:.55rem .8rem;color:#684719;font-size:.78rem}
+.live-warning-banner[hidden]{display:none}
+.live-warning-banner button{border:1px solid #d6b475;background:#fff9ed;color:#6d4a1a;border-radius:4px;padding:.25rem .45rem;font-weight:700}
+.assessment-footer{position:sticky;bottom:0;z-index:12;display:grid;grid-template-columns:repeat(5,minmax(145px,1fr));gap:1px;background:#cbd7e3;border-top:1px solid #aebed0;box-shadow:0 -3px 12px #192f4622;overflow-x:auto}
+.assessment-footer div{background:#eef3f8;padding:.45rem .7rem;min-width:145px}
+.assessment-footer span{display:block;font-size:.61rem;text-transform:uppercase;letter-spacing:.05em;color:#63778b;font-weight:800}
+.assessment-footer strong{display:block;color:#29445e;font-size:.73rem;overflow-wrap:anywhere}
+@media(max-width:1200px){.assessment-grid{grid-template-columns:minmax(170px,200px) minmax(0,1fr)}.editor-panel{grid-column:2}.problem-nav{grid-row:1 / span 2}.control-panel .environment-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:800px){.assessment-grid,.observations-grid{grid-template-columns:1fr}.problem-nav,.editor-panel,.experiments,.security-panel{grid-column:auto;grid-row:auto}.problem-nav{position:static}.control-panel .environment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.assessment-bar{position:static}}
+@media(max-width:500px){.assessment-tools{margin-top:.45rem}.question-tabs{margin-top:.45rem}.editor-actions .muted{max-width:none}}

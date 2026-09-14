@@ -90,7 +90,8 @@ def _milliseconds_between(first: str, second: str) -> float:
 
 def _chronological(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     # The server timestamp is authoritative across separate request streams.
-    # Event sequence gives stable ordering when timestamps coincide.
+    # Sequence is meaningful within a stream; ties across streams cannot prove
+    # the order in which browser actions occurred.
     return sorted(
         items,
         key=lambda item: (
@@ -178,7 +179,8 @@ def _marker_observation(
         event["event_type"] == "fullscreenchange" and not event["fullscreen"]
         for event in relevant
     )
-    network = any(event["event_type"] in {"online", "offline", "fetch_failure"} for event in relevant)
+    network = any(event["event_type"] in {"online", "offline"} for event in relevant)
+    fetch_failure = any(event["event_type"] == "fetch_failure" for event in relevant)
     max_interval = max((float(hb["delta_ms"]) for hb in nearby_heartbeats if hb["delta_ms"] is not None), default=None)
     visibility = [
         event["visibility_state"] for event in relevant
@@ -205,6 +207,7 @@ def _marker_observation(
         "heartbeat_gap_ms": max_interval,
         "heartbeat_anomaly": bool(anomalies),
         "network_change": network,
+        "fetch_failure": fetch_failure,
         "clipboard_signal": bool(clipboard),
         "browser_state_snapshot": latest_state,
     }
@@ -215,19 +218,20 @@ def _marker_observation(
         "fullscreen_exit": "observed" if fullscreen_exit else "not observed",
         "heartbeat_gap_ms": max_interval,
         "network_change": "observed" if network else "not observed",
+        "fetch_failure": "observed" if fetch_failure else "not observed",
         # Retain the original API keys for existing report consumers.
         "visibilitychange": ", ".join(visibility) if visibility else "not observed",
         "blur": "observed" if blur else "not observed",
         "fullscreenchange": "observed" if any(event["event_type"] == "fullscreenchange" for event in relevant) else "not observed",
         "heartbeat_anomaly": ", ".join(hb["gap_level"] for hb in anomalies) if anomalies else "not observed",
         "clipboard_signal": ", ".join(clipboard) if clipboard else "not observed",
-        "browser_observable": "listed signal observed" if relevant or anomalies else "no listed signal observed in ±3 s",
+        "browser_observable": "listed signal observed" if relevant or anomalies else "no listed transition or anomaly observed in ±3 s",
     }
     correlation = {
         "marker": marker, "window_seconds": WINDOW_SECONDS,
         "signals": signals, "observed": observed,
         "heartbeat_intervals_ms": [hb["delta_ms"] for hb in nearby_heartbeats if hb["delta_ms"] is not None],
-        "observation": "Browser signals observed in ±3 s." if signals else "No listed browser signal observed in ±3 s.",
+        "observation": "Browser transitions or anomalies observed in ±3 s." if signals else "No listed transition or heartbeat anomaly observed in ±3 s.",
     }
     return correlation, matrix_row
 
@@ -285,6 +289,11 @@ def analyze_session(db: sqlite3.Connection, session_id: str) -> dict[str, Any]:
         "submissions": submissions,
         "correlations": correlations,
         "detection_matrix": matrix,
+        "timeline_ordering_note": (
+            "Timeline order uses server receipt timestamps. Browser performance time "
+            "and event sequence provide finer within-page context; records with equal "
+            "server timestamps from different streams have unresolved relative order."
+        ),
         "limitations": (
             "Absence of a browser event does not imply absence of external activity. "
             "This simulation measures only signals accessible to the local browser page."

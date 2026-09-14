@@ -41,8 +41,8 @@ Run the server **inside the operating system being measured**. `127.0.0.1` in a 
 Windows, from the `proctoring-lab` directory:
 
 ```bat
-setup.bat
-run.bat
+.\setup.bat
+.\run.bat
 ```
 
 `setup.bat` creates `.venv` using the Windows `py -3.12` launcher when available, or a Python 3.12 `python` command on PATH.
@@ -59,11 +59,11 @@ Open **http://127.0.0.1:8000/** on the same OS. Stop the server with Ctrl+C. No 
 
 ## Using the simulation
 
-1. Open the assessment page and note its session ID and environment information.
-2. Select an experiment template to display instructions. Click **START TEST**.
-3. Add a marker immediately before an intentional action whenever possible, for example `About to switch browser tab`. Perform the action, return, and add a second marker such as `Returned from browser tab`.
-4. Let the session run long enough for several heartbeats. Click **END TEST** to freeze collection and view the summary, timeline, correlation analysis, and report link.
-5. Repeat in each environment and browser. Use a fresh session for a clean comparison.
+1. Open the assessment page. Choose a 30, 45, 60, or 90 minute simulated timer and click **START ASSESSMENT**. The browser creates a session UUID and requests page fullscreen from this user gesture. Fullscreen errors are recorded; the assessment continues if the browser declines.
+2. Choose a question and language if you want the page to resemble a coding test. The three generic questions and mock Run/Submit controls are context for the browser experiment. Source text and custom input are never sent to the server or executed.
+3. Select an experiment procedure and add a marker immediately before an intentional action whenever possible, for example `About to switch browser tab`. Perform the action, return, and add a second marker such as `Returned from browser tab`.
+4. Watch the telemetry sidebar, event stream, counters, and nonblocking warnings. Let the session run long enough for several heartbeats. Click **END ASSESSMENT** to freeze collection and generate the summary, timelines, correlation analysis, and report.
+5. Repeat in each environment and browser. Use a fresh session for a clean comparison. A tab switch, Alt-Tab, browser minimize, and a host-side VMware minimize are distinct manual actions; the page records only browser-observable effects.
 
 Available templates cover tab switching, Alt-Tab to another application, browser minimize, entering and exiting fullscreen, copy/paste in the editor, the benign overlay, VMware host minimize, guest Alt-Tab, and switching host applications while the guest remains running. These are instructions only; the app never automates desktop or host actions.
 
@@ -92,7 +92,7 @@ On Windows with the project environment, use `.venv\Scripts\python.exe overlay\b
 
 ## Data and reports
 
-The FastAPI API stores sessions, browser events, heartbeats, and manual markers in a local SQLite database under `data/`. Each browser event carries a UUID, session ID, client and server timestamps, visibility/focus/fullscreen snapshots, screen and viewport dimensions, user agent, and event-specific safe metadata. The report contains event counts, a chronological timeline, heartbeat statistics and graph, marker correlations, a measured detection matrix, and limitations. Rows without measured data must remain unknown or unreported; the project does not prefill conclusions about VMware behavior.
+The FastAPI API stores sessions, browser events, heartbeats, manual markers, and mock submission metadata in a local SQLite database under `data/`. Existing databases are migrated additively; earlier sessions remain available. Each browser event carries a UUID, session ID, client sequence and high-resolution timer when available, client and server timestamps, visibility/focus/fullscreen snapshots, screen and viewport dimensions, user agent, and event-specific safe metadata. The report contains event counts, chronological and state-band timelines, heartbeat statistics and graph, fullscreen/network/editor summaries, mock submission history, marker correlations, a measured detection matrix, and limitations. Rows without measured data remain unknown or unreported; the project does not prefill conclusions about VMware behavior.
 
 The server saves generated HTML reports as `reports/session_<uuid>.html`. You can request a report at `http://127.0.0.1:8000/api/session/<uuid>/report` or regenerate a local copy while the server is running:
 
@@ -100,7 +100,7 @@ The server saves generated HTML reports as `reports/session_<uuid>.html`. You ca
 python scripts/generate_report.py <session-uuid>
 ```
 
-The helper accepts only a loopback HTTP API URL. Reports and the SQLite database are excluded from Git; they can still contain environment details and manual labels, so handle local files accordingly.
+The helper accepts only a loopback HTTP API URL. The page also offers JSON and CSV exports of the current session. Reports, exports, and the SQLite database can contain environment details and manual labels, so handle local files accordingly. Source code and custom input are not exported because they are never sent to the API.
 
 Key API routes:
 
@@ -111,14 +111,18 @@ Key API routes:
 | `POST` | `/api/events` | Save a browser event |
 | `POST` | `/api/heartbeat` | Save a snapshot and interval |
 | `POST` | `/api/marker` | Save a manual label |
+| `POST` | `/api/submission` | Save metadata and an explicitly mock result; never source code |
 | `GET` | `/api/session/{id}` | Retrieve a session |
 | `GET` | `/api/session/{id}/timeline` | Chronological records |
 | `GET` | `/api/session/{id}/analysis` | Summary and marker correlation |
 | `GET` | `/api/session/{id}/report` | HTML report |
+| `GET` | `/api/session/{id}/submissions` | Mock submission history |
+| `GET` | `/api/session/{id}/export/json` | Raw local-session JSON download |
+| `GET` | `/api/session/{id}/export/csv` | Chronological CSV download |
 
 ## Interpreting the results
 
-Visibility, focus, and fullscreen are different signals. A browser can lose focus while its document remains visible. A host action may alter guest timing without producing an explicit browser event, or may produce an event in a particular setup. The heartbeat labels are based on elapsed server receipt time: **NORMAL** below 4 seconds, **WARNING** from 4 through 8 seconds, and **LARGE GAP** above 8 seconds. Network loopback latency, scheduling, tab throttling, VM suspension, and machine load can contribute. A missing browser signal says only what this page did not record during that run.
+Visibility, focus, and fullscreen are different signals. A browser can lose focus while its document remains visible. A host action may alter guest timing without producing an explicit browser event, or may produce an event in a particular setup. The heartbeat labels are based on elapsed server receipt time: **NORMAL** below 4 seconds, **WARNING** from 4 through 8 seconds, and **LARGE GAP** above 8 seconds. Network loopback latency, scheduling, tab throttling, VM suspension, and machine load can contribute. `navigator.onLine` is only a browser connectivity hint; a failed localhost request is recorded separately when possible. A missing browser signal says only what this page did not record during that run. Colored state bands interpolate between recorded snapshots; they are a visualization of observations, not continuous host-OS measurements.
 
 The detection matrix should be populated from your measured sessions. Use the following note sheet alongside the generated reports:
 
@@ -148,8 +152,16 @@ On Ubuntu:
 
 The pytest configuration disables its cache and uses a fresh, project-local temporary directory for each run. This avoids access errors involving an existing `AppData\Local\Temp\pytest-of-...` or `.pytest_cache` directory on Windows. The temporary directory is removed when the run finishes. Then run the server and visit `/` to verify the page. Create a short test session, generate at least one event, wait for heartbeats, add a marker, end the test, and open its analysis and report endpoints. The tests exercise local API behavior; they cannot simulate a real host/guest focus transition or establish how a particular VMware installation behaves.
 
+With the server running, you can also exercise every major route from another terminal:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\smoke_test.py
+```
+
+On Ubuntu, run `.venv/bin/python scripts/smoke_test.py`. This creates one clearly labeled synthetic session in the local database and checks page delivery, event persistence, heartbeats, analysis, the HTML report, and both exports. It measures API operation only; use the browser for real focus and visibility experiments.
+
 ## Limitations and ethical use
 
-This is a controlled measurement aid, not a proctoring product or an assessment bypass. JavaScript event delivery depends on the browser and OS. The page cannot observe arbitrary host processes, host windows, desktop overlays, or VM state unless those circumstances produce a browser-visible signal. Browser closure may prevent a final event from reaching the server. A full page reload creates a new idle client session; active-session recovery is not implemented. Manual markers are approximate. Heartbeat gaps are ambiguous. The mock editor has no real judge.
+This is a controlled measurement aid, not a proctoring product or an assessment bypass. JavaScript event delivery depends on the browser and OS. The page cannot observe arbitrary host processes, host windows, desktop overlays, or VM state unless those circumstances produce a browser-visible signal. Browser closure or a failed localhost request may prevent an event from reaching the server; the live page can show an unsaved failure that the report cannot include. A full page reload creates a new idle client session; active-session recovery is not implemented. Manual markers are approximate. Heartbeat gaps are ambiguous. Fullscreen can be declined by the browser, and this page never prevents exiting it. The mock editor has no real judge. Browser telemetry sent to a local API is also not tamper-resistant and should not be treated as proof of user intent.
 
 Use it only with systems and accounts you control. Do not inject it into third-party pages, disable monitoring, spoof or suppress signals, or use it during an actual examination. A report's language should remain observational: **“The browser did not observe a visibility change during this experiment,”** never **“this bypasses proctoring.”**

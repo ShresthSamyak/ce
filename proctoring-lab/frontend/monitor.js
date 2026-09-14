@@ -17,6 +17,8 @@ const state = {
   durationMinutes: 60,
   submissions: [],
   domContentLoaded: null,
+  preStartEvents: [],
+  stats: { focusLosses: 0, hidden: 0, paste: 0 },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -27,15 +29,15 @@ const experimentTemplates = {
   d: { title: "D · Enter and exit fullscreen", steps: ["Start the session.", "Use TOGGLE PAGE FULLSCREEN above the problem to enter page fullscreen.", "Use the same button or Escape to exit. Browser F11 mode may behave differently.", "Add a marker labeled “Fullscreen enter and exit”."], marker: "Fullscreen enter and exit" },
   e: { title: "E · Copy and paste", steps: ["Start the session.", "Copy a short piece of practice text in this local page.", "Paste it into the editor.", "Add a marker labeled “Copy and paste”."], marker: "Copy and paste" },
   f: { title: "F · Launch benign overlay", steps: ["Start the session.", "Launch overlay/benign_overlay.py on the same desktop.", "Show, move, or focus its visible window. Return to the browser.", "Add a marker labeled “Benign overlay opened”."], marker: "Benign overlay opened" },
-  g: { title: "G · VMware host test", steps: ["Inside the guest VM, start this simulation and keep the browser open.", "From the host OS, minimize the VMware application. Do not automate this action.", "Wait 10 seconds.", "Restore VMware.", "Inside the guest browser, add a marker labeled “VMware minimized”."], marker: "VMware minimized" },
+  g: { title: "G · VMware host test", steps: ["Inside the guest VM, start this simulation. START ASSESSMENT requests page fullscreen in the guest.", "Add a Before action marker, then from the host OS minimize the VMware application manually.", "Wait 10 seconds. Do not automate the host action.", "Restore VMware, then add VMware minimized and VMware restored markers in the guest browser.", "Review only the signals and heartbeat intervals actually recorded."], marker: "VMware minimized" },
   h: { title: "H · VMware guest Alt-Tab", steps: ["Inside the guest VM, start the session.", "Use Alt-Tab inside the guest to switch to a guest application.", "Return to the guest browser.", "Add a marker labeled “Guest Alt-Tab”."], marker: "Guest Alt-Tab" },
   i: { title: "I · Switch host application", steps: ["Inside the guest VM, start the session and leave the guest browser open.", "On the host OS, switch to another host application without automating the guest.", "Return to VMware.", "Add a marker labeled “Host application switch”."], marker: "Host application switch" },
 };
 
 const questions = {
-  q1: { number: 1, title: "Sum of integers", description: "Given N integers, output their sum. Values may be positive, negative, or zero.", input: "The first line contains N. The second line contains N space-separated integers.", output: "Print one integer: the sum of the given values.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer ≤ 1,000,000"], sampleInput: "4\n3 7 -2 5", sampleOutput: "13", explanation: "3 + 7 + (−2) + 5 = 13." },
-  q2: { number: 2, title: "Largest value", description: "Given N integers, output the largest value in the list.", input: "The first line contains N. The second line contains N space-separated integers.", output: "Print one integer: the largest given value.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer ≤ 1,000,000"], sampleInput: "5\n-4 8 3 8 1", sampleOutput: "8", explanation: "The largest value in the list is 8." },
-  q3: { number: 3, title: "Count even values", description: "Given N integers, count how many are divisible by 2.", input: "The first line contains N. The second line contains N space-separated integers.", output: "Print one integer: the number of even values.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer ≤ 1,000,000"], sampleInput: "6\n2 7 0 -3 -8 5", sampleOutput: "3", explanation: "The even values are 2, 0, and −8." },
+  q1: { number: 1, title: "Array maximum", description: "Given an array of N integers, output its maximum value.", input: "The first line contains N. The second line contains N space-separated integers.", output: "Print one integer: the maximum value in the array.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer ≤ 1,000,000"], sampleInput: "4\n3 7 -2 5", sampleOutput: "7", explanation: "7 is the largest value in the array." },
+  q2: { number: 2, title: "Balanced parentheses", description: "Determine whether a string of opening and closing parentheses is balanced.", input: "A single line containing only the characters ( and ).", output: "Print YES if every opening parenthesis is matched in order; otherwise print NO.", constraints: ["1 ≤ string length ≤ 100,000"], sampleInput: "(()())", sampleOutput: "YES", explanation: "Every opening parenthesis has a matching closing parenthesis." },
+  q3: { number: 3, title: "Binary search", description: "Given a sorted array and a target value, find the target's zero-based index. If the target is absent, output −1.", input: "The first line contains N and target. The second line contains N strictly increasing integers.", output: "Print the target's zero-based index, or −1 if it is absent.", constraints: ["1 ≤ N ≤ 100,000", "−1,000,000 ≤ each integer and target ≤ 1,000,000"], sampleInput: "5 7\n1 3 5 7 9", sampleOutput: "3", explanation: "The target 7 is at zero-based index 3." },
 };
 const starterCode = {
   Python: "# Write your solution here.\n# This local lab does not execute or grade code.\n",
@@ -66,6 +68,7 @@ function currentPlatform() {
 function updateEnvironment() {
   $("session-id").textContent = state.id;
   $("header-session").textContent = state.status === "idle" ? "Not started" : `${state.id.slice(0, 8)}…`;
+  $("header-fullscreen").textContent = document.fullscreenElement ? "Yes" : "No";
   $("session-start").textContent = state.startedAt ? formatDateTime(state.startedAt) : "Not started";
   $("browser-name").textContent = browserName();
   $("platform-name").textContent = currentPlatform();
@@ -88,7 +91,8 @@ function formatDateTime(value) {
 
 function formatClock(value) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString([], { hour12: false });
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}.${String(date.getMilliseconds()).padStart(3, "0")}`;
 }
 
 function setMessage(message, error = false) {
@@ -110,6 +114,8 @@ function setStatus(status) {
   $("export-csv").disabled = status !== "ended";
   $("run-code").disabled = status !== "active";
   $("submit-code").disabled = status !== "active";
+  $("duration-select").disabled = status !== "idle";
+  $("status-proctoring").textContent = { idle: "Not started", starting: "Starting local test", active: "Recording local signals", ending: "Ending local test", "end-error": "End save error", ended: "Ended" }[status];
   updateEnvironment();
 }
 
@@ -159,7 +165,9 @@ function snapshot() {
 function eventCategory(type) {
   if (type === "focus" || type === "blur") return "focus";
   if (type === "visibilitychange") return "visibility";
-  if (type === "fullscreenchange") return "fullscreen";
+  if (type === "fullscreenchange" || type === "fullscreen_error") return "fullscreen";
+  if (["online", "offline", "fetch_failure"].includes(type)) return "network";
+  if (type === "editor_change") return "editor";
   if (["copy", "paste", "cut"].includes(type)) return "clipboard";
   if (type === "marker") return "marker";
   if (type === "heartbeat") return "heartbeat";
@@ -181,7 +189,7 @@ function eventDescription(type, payload = {}) {
   if (type === "offline") return "browser reported offline";
   if (type === "fetch_failure") return `${metadata.operation || "request"} request failed`;
   if (type === "marker") return payload.label || "test marker";
-  if (type === "heartbeat") return `${Math.round(payload.delta_ms ?? 0)} ms interval${payload.gap_level ? ` · ${payload.gap_level}` : ""}`;
+  if (type === "heartbeat") return payload.delta_ms == null ? "initial heartbeat" : `${Math.round(payload.delta_ms)} ms interval${payload.gap_level ? ` · ${payload.gap_level}` : ""}`;
   if (type === "contextmenu") return "context menu requested";
   if (type === "pointerleave") return "pointer left page";
   if (type === "pointerenter") return "pointer entered page";
@@ -195,6 +203,7 @@ function eventDescription(type, payload = {}) {
 
 function appendLive(type, payload = {}) {
   const list = $("event-list");
+  const followLatest = list.scrollTop + list.clientHeight >= list.scrollHeight - 30;
   list.querySelector(".empty-state")?.remove();
   const item = document.createElement("li");
   item.className = `event-${eventCategory(type)}`;
@@ -213,19 +222,56 @@ function appendLive(type, payload = {}) {
   description.className = "event-description";
   description.textContent = eventDescription(type, payload);
   item.append(time, label, description);
-  list.prepend(item);
+  list.append(item);
   applyEventFilter();
-  while (list.children.length > 150) list.lastElementChild.remove();
+  while (list.children.length > 150) list.firstElementChild.remove();
+  if (followLatest) list.scrollTop = list.scrollHeight;
   state.eventCount += 1;
-  $("event-total").textContent = `${state.eventCount} events`;
-  if (type === "heartbeat" && ["WARNING", "LARGE GAP"].includes(payload.gap_level)) {
-    state.warningCount += 1;
-    $("warning-count").textContent = state.warningCount;
-    const warningList = $("warning-list");
-    if (state.warningCount === 1) warningList.replaceChildren();
-    const warning = document.createElement("li");
-    warning.textContent = `${formatClock(payload.server_timestamp)} · ${payload.gap_level}: ${Math.round(payload.delta_ms)} ms`;
-    warningList.prepend(warning);
+  $("event-total").textContent = `${state.eventCount} entries`;
+  updateTelemetryStats(type, payload);
+}
+
+function addWarning(message, timestamp) {
+  state.warningCount += 1;
+  $("warning-count").textContent = state.warningCount;
+  const list = $("warning-list");
+  if (state.warningCount === 1) list.replaceChildren();
+  const item = document.createElement("li");
+  item.textContent = `${formatClock(timestamp || new Date().toISOString())} · ${message}`;
+  list.prepend(item);
+  while (list.children.length > 30) list.lastElementChild.remove();
+  $("live-warning-text").textContent = `Browser observation: ${message}. This alone does not establish external activity.`;
+  $("live-warning-banner").hidden = false;
+}
+
+function updateTelemetryStats(type, payload) {
+  const focus = payload.document_has_focus ?? payload.has_focus;
+  if (typeof focus === "boolean") $("stat-focus").textContent = focus ? "Yes" : "No";
+  if (typeof payload.fullscreen === "boolean") $("stat-fullscreen").textContent = payload.fullscreen ? "Yes" : "No";
+  if (typeof payload.fullscreen === "boolean") $("header-fullscreen").textContent = payload.fullscreen ? "Yes" : "No";
+  if (payload.visibility_state) $("stat-visible").textContent = payload.visibility_state === "visible" ? "Yes" : "No";
+  const time = payload.timestamp_client || payload.client_timestamp || payload.server_timestamp;
+  if (type === "blur") {
+    $("stat-focus-losses").textContent = ++state.stats.focusLosses;
+    addWarning("Window lost focus", time);
+  }
+  if (type === "visibilitychange" && payload.visibility_state === "hidden") {
+    $("stat-hidden").textContent = ++state.stats.hidden;
+    addWarning("Document became hidden", time);
+  }
+  if (type === "fullscreenchange" && !payload.fullscreen) addWarning("Page exited fullscreen", time);
+  if (type === "fullscreen_error") addWarning("Page fullscreen request failed", time);
+  if (type === "paste") $("stat-paste").textContent = ++state.stats.paste;
+  if (type === "online" || type === "offline") {
+    $("stat-network").textContent = type === "online" ? "Online" : "Offline";
+    $("status-network").textContent = type === "online" ? "Online" : "Offline";
+    addWarning(`Browser reported ${type}`, time);
+  }
+  if (type === "fetch_failure") addWarning(`${payload.metadata?.operation || "Local API"} request failed`, time);
+  if (type === "fetch_failure") { $("stat-network").textContent = "Request failed"; $("status-network").textContent = "Request failed"; }
+  if (type === "heartbeat") {
+    $("stat-heartbeat").textContent = payload.delta_ms == null ? "First" : `${Math.round(payload.delta_ms)} ms`;
+    if (["WARNING", "LARGE GAP"].includes(payload.gap_level)) addWarning(`${payload.gap_level}: ${Math.round(payload.delta_ms)} ms heartbeat gap`, time);
   }
 }
 
@@ -240,7 +286,11 @@ function sendUnloadEvent(payload) {
   fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), keepalive: true }).catch(() => {});
 }
 
-function recordEvent(eventType, metadata = {}, unload = false, observedAt = null) {
+function recordEvent(eventType, metadata = {}, unload = false, observedAt = null, observedSnapshot = null) {
+  if (state.status === "starting" && ["fullscreenchange", "fullscreen_error"].includes(eventType)) {
+    state.preStartEvents.push({ eventType, metadata, observedAt: observedAt || { timestamp_client: new Date(Date.now()).toISOString(), performance_ms: performance.now() }, observedSnapshot: observedSnapshot || snapshot() });
+    return;
+  }
   if (state.status !== "active") return;
   const payload = {
     event_id: crypto.randomUUID(),
@@ -249,7 +299,7 @@ function recordEvent(eventType, metadata = {}, unload = false, observedAt = null
     sequence: ++state.eventSequence,
     performance_ms: observedAt?.performance_ms ?? performance.now(),
     timestamp_client: observedAt?.timestamp_client ?? new Date(Date.now()).toISOString(),
-    ...snapshot(),
+    ...(observedSnapshot || snapshot()),
     metadata,
   };
   appendLive(eventType, payload);
@@ -332,7 +382,7 @@ async function sendHeartbeat() {
     });
     state.pendingHeartbeatRequest = request;
     const result = await request;
-    if (state.status === "active" && ["WARNING", "LARGE GAP"].includes(result.gap_level)) {
+    if (state.status === "active") {
       appendLive("heartbeat", result);
     }
   } catch (error) {
@@ -343,10 +393,25 @@ async function sendHeartbeat() {
   }
 }
 
+function requestAssessmentFullscreen() {
+  try {
+    if (typeof document.documentElement.requestFullscreen !== "function") throw new Error("Fullscreen API unavailable");
+    // Called synchronously from the START ASSESSMENT click, before any await.
+    Promise.resolve(document.documentElement.requestFullscreen()).catch((error) => {
+      recordEvent("fullscreen_error");
+      setMessage(`Page fullscreen request failed: ${error.message}`, true);
+    });
+  } catch (error) {
+    recordEvent("fullscreen_error");
+    setMessage(`Page fullscreen request failed: ${error.message}`, true);
+  }
+}
+
 async function startTest() {
   if (state.status !== "idle") return;
   setStatus("starting");
   setMessage("Starting local session…");
+  requestAssessmentFullscreen();
   try {
     const result = await api("/api/session/start", {
       id: state.id,
@@ -355,7 +420,7 @@ async function startTest() {
       platform: currentPlatform(),
       screen_width: screen.width,
       screen_height: screen.height,
-      language: currentLanguage,
+      language: navigator.language || "unknown",
       hardware_concurrency: navigator.hardwareConcurrency || null,
       device_memory: navigator.deviceMemory || null,
       viewport_width: window.innerWidth,
@@ -371,12 +436,14 @@ async function startTest() {
     setStatus("active");
     setMessage("Recording page events and sending a heartbeat every two seconds.");
     if (state.domContentLoaded) recordEvent("domcontentloaded", {}, false, state.domContentLoaded);
+    for (const buffered of state.preStartEvents.splice(0)) recordEvent(buffered.eventType, buffered.metadata, false, buffered.observedAt, buffered.observedSnapshot);
     await sendHeartbeat();
     if (state.status === "active") {
       state.heartbeatTimer = window.setInterval(sendHeartbeat, 2000);
       state.elapsedTimer = window.setInterval(updateElapsed, 1000);
     }
   } catch (error) {
+    state.preStartEvents.length = 0;
     setStatus("idle");
     setMessage(`Could not start session: ${error.message}`, true);
   }
@@ -394,7 +461,7 @@ async function endTest() {
     await api("/api/session/end", { session_id: state.id });
   } catch (error) {
     setStatus("end-error");
-    setMessage(`Session end could not be saved: ${error.message}. Click END TEST to retry.`, true);
+    setMessage(`Session end could not be saved: ${error.message}. Click END ASSESSMENT to retry.`, true);
     return;
   }
   setStatus("ended");
@@ -419,6 +486,7 @@ async function endTest() {
 function showMarkerDialog() {
   if (state.status !== "active") return;
   $("marker-label").value = experimentTemplates[$("experiment-select").value].marker;
+  $("marker-preset").value = $("marker-label").value;
   $("marker-dialog").showModal();
   $("marker-label").focus();
 }
@@ -535,7 +603,7 @@ function renderTimeline(items) {
   }
   const legend = document.createElement("div");
   legend.className = "timeline-legend";
-  for (const [name, color] of [["Focus", "#208470"], ["Visibility", "#d48224"], ["Fullscreen", "#795cbd"], ["Clipboard", "#bf5688"], ["Heartbeat", "#6f97ba"], ["Marker", "#d06c24"]]) {
+  for (const [name, color] of [["Focus", "#208470"], ["Visibility", "#d48224"], ["Fullscreen", "#795cbd"], ["Network", "#a4462e"], ["Editor", "#285f9c"], ["Clipboard", "#bf5688"], ["Heartbeat", "#6f97ba"], ["Marker", "#d06c24"]]) {
     const chip = document.createElement("span");
     chip.style.setProperty("--dot", color);
     chip.textContent = name;
@@ -751,6 +819,7 @@ function renderSubmissionHistory() {
   }
   const submits = state.submissions.filter((item) => item.action === "submit");
   $("submission-count").textContent = `Mock submissions this session: ${submits.length}`;
+  $("status-submission-count").textContent = String(submits.length);
   for (const id of Object.keys(questions)) {
     const count = submits.filter((item) => item.question_id === id).length;
     $(`nav-state-${id}`).textContent = count ? `${count} mock submission${count === 1 ? "" : "s"}` : "Not submitted";
@@ -772,6 +841,7 @@ async function simulateAssessmentAction(action) {
     state.submissions.push(record);
     renderSubmissionHistory();
     $("result-state").textContent = `Mock ${record.result}`;
+    if (action === "run") $("last-run-status").textContent = `Mock ${record.result}`;
     $("editor-result").textContent = `${record.evaluation_note || "Mock result only; source code was not evaluated."} The result is scripted and independent of your code or custom input.`;
   } catch (error) {
     $("result-state").textContent = "Record failed";
@@ -798,7 +868,7 @@ function initEditor() {
       old_length: lastEditorLength,
       new_length: newLength,
       delta_length: delta,
-      change_size: magnitude <= 1 ? "SMALL_CHANGE" : magnitude <= 20 ? "MEDIUM_CHANGE" : "LARGE_CHANGE",
+      change_size: magnitude < 30 ? "SMALL_CHANGE" : magnitude <= 150 ? "MEDIUM_CHANGE" : "LARGE_CHANGE",
     });
     lastEditorLength = newLength;
     editorDrafts[draftKey()] = editor.value;
@@ -840,7 +910,9 @@ function initEditor() {
 }
 
 function setTelemetryOpen(open) {
+  if (!open && $("telemetry-sidebar").contains(document.activeElement)) $("toggle-telemetry").focus();
   $("telemetry-sidebar").classList.toggle("is-open", open);
+  $("telemetry-sidebar").inert = !open;
   $("telemetry-sidebar").setAttribute("aria-hidden", String(!open));
   $("toggle-telemetry").setAttribute("aria-expanded", String(open));
   $("telemetry-backdrop").hidden = !open;
@@ -848,6 +920,11 @@ function setTelemetryOpen(open) {
 
 function init() {
   updateEnvironment();
+  $("stat-fullscreen").textContent = document.fullscreenElement ? "Yes" : "No";
+  $("stat-visible").textContent = document.visibilityState === "visible" ? "Yes" : "No";
+  $("stat-focus").textContent = document.hasFocus() ? "Yes" : "No";
+  $("stat-network").textContent = navigator.onLine ? "Online" : "Offline";
+  $("status-network").textContent = navigator.onLine ? "Online" : "Offline";
   renderExperiment();
   installEventListeners();
   initEditor();
@@ -857,6 +934,9 @@ function init() {
   $("cancel-marker").addEventListener("click", () => $("marker-dialog").close());
   $("marker-form").addEventListener("submit", saveMarker);
   $("experiment-select").addEventListener("change", renderExperiment);
+  $("duration-select").addEventListener("change", () => { if (state.status === "idle") { state.durationMinutes = Number($("duration-select").value); updateElapsed(); } });
+  $("marker-preset").addEventListener("change", () => { if ($("marker-preset").value) $("marker-label").value = $("marker-preset").value; });
+  $("dismiss-warning").addEventListener("click", () => { $("live-warning-banner").hidden = true; });
   $("vm-mode").addEventListener("change", () => {
     if ($("vm-mode").checked) $("experiment-select").value = "g";
     renderExperiment();

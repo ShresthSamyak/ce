@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
-import sqlite3
 import csv
 import io
+import json
+import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .analysis import analyze_session, build_timeline
 from .database import PROJECT_ROOT, connection, initialize_database
@@ -22,7 +23,7 @@ from .report import render_report
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
 
 
 def utc_text(value: datetime) -> str:
@@ -51,19 +52,29 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="PROCTORING-LAB", version="1.0.0", lifespan=lifespan)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
 FRONTEND = PROJECT_ROOT / "frontend"
 
 
 @app.middleware("http")
 async def restrict_api_payload(request: Request, call_next):
     if request.url.path.startswith("/api/") and request.method == "POST":
+        origin = request.headers.get("origin")
+        if origin and origin != str(request.base_url).rstrip("/"):
+            return JSONResponse({"detail": "Cross-origin writes are not allowed"}, status_code=403)
+        if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+            return JSONResponse({"detail": "JSON request body required"}, status_code=415)
         length = request.headers.get("content-length")
         if length is not None and (not length.isdecimal() or int(length) > 8192):
             return JSONResponse({"detail": "Request body exceeds 8192 bytes"}, status_code=413)
-        # Starlette caches this body for downstream parsing; the size check also
-        # covers clients that omit Content-Length.
-        if len(await request.body()) > 8192:
-            return JSONResponse({"detail": "Request body exceeds 8192 bytes"}, status_code=413)
+        # Stream within a fixed cap, including clients that omit Content-Length.
+        # Caching the checked bytes lets downstream FastAPI parse this same body.
+        body = bytearray()
+        async for chunk in request.stream():
+            body.extend(chunk)
+            if len(body) > 8192:
+                return JSONResponse({"detail": "Request body exceeds 8192 bytes"}, status_code=413)
+        request._body = bytes(body)
     return await call_next(request)
 
 
@@ -132,6 +143,7 @@ def start_session(payload: SessionStart):
 @app.post("/api/session/end")
 def end_session(payload: SessionEnd):
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         session = get_session(db, payload.session_id)
         if session["ended_at"] is None:
             db.execute("UPDATE sessions SET ended_at = ? WHERE id = ?", (utc_now(), session["id"]))
@@ -146,9 +158,10 @@ def record_event(payload: EventIn):
         allowed = {"keyCategory", "ctrl", "alt", "shift", "meta", "repeat"}
         if metadata.keys() - allowed:
             raise HTTPException(422, "Keydown metadata may contain only safe categories and modifiers")
-        if "keyCategory" in metadata and metadata["keyCategory"] not in {
-            "modifier", "navigation", "editing", "function", "character", "other"
-        }:
+        if "keyCategory" in metadata and (
+            not isinstance(metadata["keyCategory"], str)
+            or metadata["keyCategory"] not in {"modifier", "navigation", "editing", "function", "character", "other"}
+        ):
             raise HTTPException(422, "Invalid key category")
         if any(type(metadata[key]) is not bool for key in ("ctrl", "alt", "shift", "meta", "repeat") if key in metadata):
             raise HTTPException(422, "Key modifiers must be booleans")
@@ -193,6 +206,7 @@ def record_event(payload: EventIn):
         "metadata": metadata,
     }
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         require_active(db, payload.session_id)
         try:
             db.execute(
@@ -233,6 +247,7 @@ def record_heartbeat(payload: HeartbeatIn):
         "fullscreen": payload.fullscreen,
     }
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         require_active(db, payload.session_id)
         previous = db.execute(
             "SELECT server_timestamp FROM heartbeats WHERE session_id=? ORDER BY server_timestamp DESC, sequence DESC LIMIT 1",
@@ -271,6 +286,7 @@ def record_marker(payload: MarkerIn):
         "timestamp_server": utc_now(),
     }
     with connection() as db:
+        db.execute("BEGIN IMMEDIATE")
         require_active(db, payload.session_id)
         db.execute(
             "INSERT INTO markers VALUES (:id,:session_id,:label,:timestamp_client,:timestamp_server)", marker

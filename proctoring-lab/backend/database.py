@@ -69,9 +69,9 @@ def initialize_database() -> None:
                 viewport_width INTEGER NOT NULL,
                 viewport_height INTEGER NOT NULL,
                 user_agent TEXT NOT NULL,
-                metadata_json TEXT NOT NULL
-                ,sequence INTEGER
-                ,performance_ms REAL
+                metadata_json TEXT NOT NULL,
+                sequence INTEGER,
+                performance_ms REAL
             );
             CREATE INDEX IF NOT EXISTS events_session_time ON events(session_id, server_timestamp);
             CREATE TABLE IF NOT EXISTS heartbeats (

@@ -32,44 +32,46 @@
         <div><dt>Viewport</dt><dd id="viewport-size">—</dd></div>
         <div><dt>Screen resolution</dt><dd id="screen-size">—</dd></div>
       </dl>
+      <div class="session-options"><label for="duration-select">Assessment duration</label><select id="duration-select"><option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60" selected>60 minutes</option><option value="90">90 minutes</option></select><span>Choose before starting. Timer display is part of the local simulation.</span></div>
       <div class="button-row">
-        <button id="start-test" class="button button-primary">START TEST</button>
-        <button id="end-test" class="button button-secondary" disabled>END TEST</button>
+        <button id="start-test" class="button button-primary">START ASSESSMENT</button>
+        <button id="end-test" class="button button-secondary" disabled>END ASSESSMENT</button>
         <button id="add-marker" class="button button-secondary" disabled>ADD TEST MARKER</button>
         <button id="view-report" class="button button-quiet" disabled>OPEN HTML REPORT ↗</button>
         <button id="export-json" class="button button-quiet" disabled>EXPORT JSON</button>
         <button id="export-csv" class="button button-quiet" disabled>EXPORT CSV</button>
       </div>
-      <p id="app-message" class="app-message" role="status" aria-live="polite">Start a test to record browser events and two-second heartbeats.</p>
+      <p id="app-message" class="app-message" role="status" aria-live="polite">Start requests page fullscreen and begins browser-event recording with two-second heartbeats.</p>
     </section>
 
     <section class="assessment-bar" aria-label="Assessment status">
       <div class="assessment-title"><strong>Programming Assessment</strong><span class="assessment-pill">Practice / unranked</span><span class="assessment-pill">3 questions</span></div>
       <nav class="question-tabs" aria-label="Question tabs"><button type="button" class="question-tab is-current" data-question="q1" aria-current="page">Q1</button><button type="button" class="question-tab" data-question="q2">Q2</button><button type="button" class="question-tab" data-question="q3">Q3</button></nav>
-      <div class="assessment-tools"><span class="elapsed-label">Time left <strong id="time-left">60:00</strong></span><span class="elapsed-label">Elapsed <strong id="elapsed-time">00:00</strong></span><span class="assessment-session">Session <strong id="header-session">Not started</strong></span><button id="toggle-fullscreen" class="button button-quiet">PAGE FULLSCREEN</button><button id="toggle-telemetry" class="button button-secondary" aria-controls="telemetry-sidebar" aria-expanded="false">TELEMETRY <span id="warning-count">0</span></button></div>
+      <div class="assessment-tools"><span class="elapsed-label">Time left <strong id="time-left">60:00</strong></span><span class="elapsed-label">Elapsed <strong id="elapsed-time">00:00</strong></span><span class="assessment-session">Session <strong id="header-session">Not started</strong></span><span class="assessment-session">Fullscreen <strong id="header-fullscreen">No</strong></span><button id="toggle-fullscreen" class="button button-quiet">PAGE FULLSCREEN</button><button id="toggle-telemetry" class="button button-secondary" aria-controls="telemetry-sidebar" aria-expanded="false">TELEMETRY <span id="warning-count">0</span></button></div>
     </section>
+    <div id="live-warning-banner" class="live-warning-banner" role="status" aria-live="polite" hidden><span id="live-warning-text"></span><button id="dismiss-warning" type="button" aria-label="Dismiss observation">Dismiss</button></div>
 
     <section class="assessment-grid" aria-label="Mock coding assessment">
       <aside class="problem-nav panel" aria-label="Problem navigation">
         <p class="eyebrow">PROBLEMS</p>
-        <button type="button" class="problem-nav-item is-current" data-question="q1" aria-current="page"><span class="problem-index">1</span><span><strong>Sum of integers</strong><small id="nav-state-q1">Not submitted</small></span></button>
-        <button type="button" class="problem-nav-item" data-question="q2"><span class="problem-index">2</span><span><strong>Largest value</strong><small id="nav-state-q2">Not submitted</small></span></button>
-        <button type="button" class="problem-nav-item" data-question="q3"><span class="problem-index">3</span><span><strong>Count even values</strong><small id="nav-state-q3">Not submitted</small></span></button>
+        <button type="button" class="problem-nav-item is-current" data-question="q1" aria-current="page"><span class="problem-index">1</span><span><strong>Array maximum</strong><small id="nav-state-q1">Not submitted</small></span></button>
+        <button type="button" class="problem-nav-item" data-question="q2"><span class="problem-index">2</span><span><strong>Balanced parentheses</strong><small id="nav-state-q2">Not submitted</small></span></button>
+        <button type="button" class="problem-nav-item" data-question="q3"><span class="problem-index">3</span><span><strong>Binary search</strong><small id="nav-state-q3">Not submitted</small></span></button>
         <p class="nav-note">Drafts stay in this browser tab. There is no remote judge.</p>
       </aside>
       <article class="problem panel">
-        <div class="section-heading"><div><p id="problem-kicker" class="eyebrow">QUESTION 1 / 3 · PRACTICE</p><h2 id="problem-title">Sum of integers</h2></div><span class="difficulty">Easy</span></div>
+        <div class="section-heading"><div><p id="problem-kicker" class="eyebrow">QUESTION 1 / 3 · PRACTICE</p><h2 id="problem-title">Array maximum</h2></div><span class="difficulty">Easy</span></div>
         <div class="problem-meta"><span>Time limit: simulated</span><span>Memory limit: simulated</span><span>Judge: unavailable</span></div>
-        <p id="problem-description">Given N integers, output their sum. The values may be positive, negative, or zero.</p>
+        <p id="problem-description">Given an array of N integers, output its maximum value.</p>
         <h3>Input format</h3>
         <p id="input-format">The first line contains N. The second line contains N space-separated integers.</p>
         <h3>Output format</h3>
-        <p id="output-format">Print one integer: the sum of the given values.</p>
+        <p id="output-format">Print one integer: the maximum value in the array.</p>
         <h3>Constraints</h3>
         <ul id="constraints-list" class="constraints"><li>1 ≤ N ≤ 100,000</li><li>−1,000,000 ≤ each integer ≤ 1,000,000</li></ul>
         <div class="samples"><section><h3>Sample input <button type="button" id="copy-sample" class="text-button" aria-label="Copy sample input">Copy sample</button></h3><pre><code id="sample-input">4
-3 7 -2 5</code></pre></section><section><h3>Sample output</h3><pre><code id="sample-output">13</code></pre></section></div>
-        <h3>Explanation</h3><p id="problem-explanation">3 + 7 + (−2) + 5 = 13.</p>
+3 7 -2 5</code></pre></section><section><h3>Sample output</h3><pre><code id="sample-output">7</code></pre></section></div>
+        <h3>Explanation</h3><p id="problem-explanation">7 is the largest value in the array.</p>
         <p class="problem-disclaimer">Practice only: code is not executed or graded, and no source code is sent to the server.</p>
       </article>
 
@@ -83,16 +85,17 @@
         <section class="input-panel" aria-labelledby="input-heading"><div class="input-head"><h3 id="input-heading">Input for local practice</h3><span>Not sent to server</span></div><div class="input-switch" role="group" aria-label="Input source"><button type="button" id="use-sample" class="input-choice is-selected" aria-pressed="true">Sample input</button><button type="button" id="use-custom" class="input-choice" aria-pressed="false">Custom input</button></div><label for="custom-input" class="sr-only">Custom input</label><textarea id="custom-input" class="custom-input" spellcheck="false" aria-label="Practice input" readonly>4
 3 7 -2 5</textarea></section>
         <div class="editor-actions"><span class="muted">Start a test to use the mock Run/Submit service. Source and custom input stay in this tab.</span><div class="button-row"><button id="run-code" class="button button-secondary" disabled>Run code</button><button id="submit-code" class="button button-primary" disabled>Submit solution</button></div></div>
-        <section class="result-panel" aria-labelledby="result-heading"><div class="result-heading"><h3 id="result-heading">Result</h3><span id="result-state" class="result-state">Not run</span></div><p id="editor-result" class="editor-result" role="status" aria-live="polite">Start a test, then click Run code or Submit solution to create a mock record.</p><div class="output-grid"><div><strong>Expected sample output</strong><pre id="expected-output">13</pre></div><div><strong>Program output</strong><pre id="program-output">Unavailable — code execution is disabled.</pre></div></div><p id="submission-count" class="submission-count">Mock submissions this session: 0</p><h3 class="history-title">Submission history</h3><ol id="submission-history" class="submission-history"><li>No mock submissions yet.</li></ol></section>
+        <section class="result-panel" aria-labelledby="result-heading"><div class="result-heading"><h3 id="result-heading">Result</h3><span id="result-state" class="result-state">Not run</span></div><p id="editor-result" class="editor-result" role="status" aria-live="polite">Start a test, then click Run code or Submit solution to create a mock record.</p><div class="output-grid"><div><strong>Expected sample output</strong><pre id="expected-output">7</pre></div><div><strong>Program output</strong><pre id="program-output">Unavailable — code execution is disabled.</pre></div></div><p id="submission-count" class="submission-count">Mock submissions this session: 0</p><h3 class="history-title">Submission history</h3><ol id="submission-history" class="submission-history"><li>No mock submissions yet.</li></ol></section>
       </section>
     </section>
 
-    <aside id="telemetry-sidebar" class="telemetry-sidebar" aria-labelledby="monitor-heading" aria-hidden="true">
-      <div class="section-heading"><div><p class="eyebrow">LOCAL BROWSER SIGNALS</p><h2 id="monitor-heading">EVENT MONITOR</h2></div><button id="close-telemetry" class="icon-button" aria-label="Close telemetry panel">×</button></div>
+    <aside id="telemetry-sidebar" class="telemetry-sidebar" aria-labelledby="monitor-heading" aria-hidden="true" inert>
+      <div class="section-heading"><div><p class="eyebrow">EVENT MONITOR / LOCAL BROWSER SIGNALS</p><h2 id="monitor-heading">PROCTORING TELEMETRY</h2></div><button id="close-telemetry" class="icon-button" aria-label="Close telemetry panel">×</button></div>
       <p class="muted">Safe metadata only. No keys, source, or clipboard text.</p>
-      <div class="telemetry-controls"><label for="event-filter">Show</label><select id="event-filter"><option value="all">All signals</option><option value="focus">Focus</option><option value="visibility">Visibility</option><option value="fullscreen">Fullscreen</option><option value="clipboard">Clipboard</option><option value="heartbeat">Heartbeats</option><option value="marker">Markers</option><option value="interaction">Other page events</option></select><span id="event-total" class="counter">0 events</span></div>
-      <section class="warning-panel" aria-labelledby="warning-heading"><h3 id="warning-heading">Timing warnings</h3><ol id="warning-list"><li>No heartbeat anomalies measured.</li></ol><p>Warnings indicate timing gaps only; they do not prove an external action.</p></section>
-      <ol id="event-list" class="event-list" aria-live="polite" aria-relevant="additions"><li class="empty-state">Events will appear after START TEST.</li></ol>
+      <div class="telemetry-stats"><div><span>Fullscreen</span><strong id="stat-fullscreen">No</strong></div><div><span>Page visible</span><strong id="stat-visible">Yes</strong></div><div><span>Browser focus</span><strong id="stat-focus">Yes</strong></div><div><span>Heartbeat</span><strong id="stat-heartbeat">—</strong></div><div><span>Focus losses</span><strong id="stat-focus-losses">0</strong></div><div><span>Hidden transitions</span><strong id="stat-hidden">0</strong></div><div><span>Paste events</span><strong id="stat-paste">0</strong></div><div><span>Network</span><strong id="stat-network">Online</strong></div></div>
+      <div class="telemetry-controls"><label for="event-filter">Show</label><select id="event-filter"><option value="all">All signals</option><option value="focus">Focus</option><option value="visibility">Visibility</option><option value="fullscreen">Fullscreen</option><option value="network">Network</option><option value="editor">Editor</option><option value="clipboard">Clipboard</option><option value="heartbeat">Heartbeats</option><option value="marker">Markers</option><option value="interaction">Other page events</option></select><span id="event-total" class="counter">0 entries</span></div>
+      <section class="warning-panel" aria-labelledby="warning-heading"><h3 id="warning-heading">Observed changes and timing warnings</h3><ol id="warning-list"><li>No noteworthy change measured.</li></ol><p>Signals and gaps describe browser observations only; they do not prove an external action.</p></section>
+      <ol id="event-list" class="event-list" aria-live="polite" aria-relevant="additions"><li class="empty-state">Events will appear after START ASSESSMENT.</li></ol>
     </aside>
     <div id="telemetry-backdrop" class="telemetry-backdrop" hidden></div>
 
@@ -139,10 +142,13 @@
     <form method="dialog" id="marker-form">
       <h2 id="marker-heading">Add test marker</h2>
       <p>Describe the action you just performed. The label is stored alongside browser telemetry.</p>
+      <label for="marker-preset">Preset label (optional)</label>
+      <select id="marker-preset"><option value="">Choose or type your own</option><option>Browser tab switch</option><option>Alt-Tab to application</option><option>Browser minimized</option><option>VMware minimized</option><option>VMware restored</option><option>Guest Alt-Tab</option><option>Host application switch</option><option>Fullscreen exited</option><option>Benign overlay opened</option><option>Benign overlay closed</option><option>Clipboard paste</option><option>Network disabled</option><option>Network restored</option></select>
       <label for="marker-label">Action label</label>
       <input id="marker-label" name="label" type="text" maxlength="100" required placeholder="e.g. Minimized VMware window">
       <div class="button-row"><button type="button" id="cancel-marker" class="button button-quiet">Cancel</button><button type="submit" class="button button-primary">Save marker</button></div>
     </form>
   </dialog>
+  <footer class="assessment-footer" aria-label="Assessment status bar"><div><span>Compilation status</span><strong id="compilation-status">Not compiled (mock)</strong></div><div><span>Last run</span><strong id="last-run-status">No mock run</strong></div><div><span>Submission count</span><strong id="status-submission-count">0</strong></div><div><span>Network status</span><strong id="status-network">Online</strong></div><div><span>Proctoring status</span><strong id="status-proctoring">Not started</strong></div></footer>
 </body>
 </html>
