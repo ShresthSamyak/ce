@@ -132,13 +132,19 @@ Test each desired browser separately in the Windows 11 guest and Ubuntu 24.04 gu
 
 ## Validation
 
-After setup, run the automated tests from the project root:
+After setup, run the automated tests from the project root. On Windows PowerShell:
 
-```sh
-python -m pytest
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Use the virtual-environment interpreter if `python` points elsewhere: `.venv\Scripts\python.exe -m pytest` on Windows, or `.venv/bin/python -m pytest` on Ubuntu. Then run the server and visit `/` to verify the page. Create a short test session, generate at least one event, wait for heartbeats, add a marker, end the test, and open its analysis and report endpoints. The tests exercise local API behavior; they cannot simulate a real host/guest focus transition or establish how a particular VMware installation behaves.
+On Ubuntu:
+
+```sh
+.venv/bin/python -m pytest -q
+```
+
+The pytest configuration disables its cache and uses a fresh, project-local temporary directory for each run. This avoids access errors involving an existing `AppData\Local\Temp\pytest-of-...` or `.pytest_cache` directory on Windows. The temporary directory is removed when the run finishes. Then run the server and visit `/` to verify the page. Create a short test session, generate at least one event, wait for heartbeats, add a marker, end the test, and open its analysis and report endpoints. The tests exercise local API behavior; they cannot simulate a real host/guest focus transition or establish how a particular VMware installation behaves.
 
 ## Limitations and ethical use
 

@@ -4,16 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Proctoring Lab — local assessment simulation</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/monitor.js" defer></script>
 </head>
 <body>
   <header class="site-header">
-    <div>
-      <p class="eyebrow">PROCTORING LAB</p>
+    <div class="site-identity"><span class="brand-mark" aria-hidden="true">PL</span><div>
+      <p class="eyebrow">PROCTORING LAB / PRACTICE CONTEST</p>
       <h1>PROCTORING SIMULATION — LOCAL TEST ENVIRONMENT</h1>
-      <p class="subheading">A controlled page for measuring browser-observable signals. No code is executed or graded.</p>
-    </div>
+      <p class="subheading">A controlled coding-assessment page for measuring browser-observable signals.</p>
+    </div></div>
     <span class="local-badge" aria-label="Localhost only">● LOCAL ONLY</span>
   </header>
 
@@ -41,33 +42,43 @@
     </section>
 
     <section class="assessment-bar" aria-label="Assessment status">
-      <div class="assessment-title"><strong>Practice assessment</strong><span>Problem 1 of 1 · Sum of integers</span></div>
+      <div class="assessment-title"><strong>Practice contest</strong><span>1 problem</span><span class="assessment-pill">Unranked simulation</span></div>
       <div class="assessment-tools"><span class="elapsed-label">Elapsed <strong id="elapsed-time">00:00</strong></span><button id="toggle-fullscreen" class="button button-quiet">TOGGLE PAGE FULLSCREEN</button></div>
     </section>
 
     <section class="assessment-grid" aria-label="Mock coding assessment">
+      <aside class="problem-nav panel" aria-label="Problem navigation">
+        <p class="eyebrow">PROBLEMS</p>
+        <div class="problem-nav-item" aria-current="page"><span class="problem-index">A</span><span><strong>Sum of integers</strong><small id="problem-state">Not submitted</small></span></div>
+        <p class="nav-note">One local practice task. There is no ranking or remote judge.</p>
+      </aside>
       <article class="problem panel">
-        <div class="section-heading"><div><p class="eyebrow">PROBLEM 01 · PRACTICE</p><h2>Sum of integers</h2></div><span class="difficulty">Easy</span></div>
-        <p>Given <var>N</var> integers, output their sum.</p>
-        <h3>Input</h3>
+        <div class="section-heading"><div><p class="eyebrow">PROBLEM A · PRACTICE</p><h2>Sum of integers</h2></div><span class="difficulty">Easy</span></div>
+        <div class="problem-meta"><span>Time limit: simulated</span><span>Memory limit: simulated</span><span>Judge: unavailable</span></div>
+        <p>Given <var>N</var> integers, output their sum. The values may be positive, negative, or zero.</p>
+        <h3>Input format</h3>
         <p>The first line contains <var>N</var>. The second line contains <var>N</var> space-separated integers.</p>
-        <h3>Output</h3>
+        <h3>Output format</h3>
         <p>Print one integer: the sum of the given values.</p>
-        <h3>Sample input</h3>
-        <pre><code>4
-3 7 -2 5</code></pre>
-        <h3>Sample output</h3>
-        <pre><code>13</code></pre>
-        <p class="muted">This is a mock assessment. Run and Submit only record a local UI action; they do not execute code.</p>
+        <h3>Constraints</h3>
+        <ul class="constraints"><li>1 ≤ <var>N</var> ≤ 100,000</li><li>−1,000,000 ≤ each integer ≤ 1,000,000</li></ul>
+        <div class="samples"><section><h3>Sample input <button type="button" id="copy-sample" class="text-button" aria-label="Copy sample input">Copy sample</button></h3><pre><code id="sample-input">4
+3 7 -2 5</code></pre></section><section><h3>Sample output</h3><pre><code>13</code></pre></section></div>
+        <h3>Explanation</h3><p><code>3 + 7 + (−2) + 5 = 13</code>.</p>
+        <p class="problem-disclaimer">Practice only: code is not executed or graded, and no source code is sent to the server.</p>
       </article>
 
       <section class="editor-panel panel" aria-labelledby="editor-heading">
-        <div class="section-heading"><div><p class="eyebrow">WORKSPACE</p><h2 id="editor-heading">Code editor</h2></div><label class="language-label">Language <select id="language"><option>Python 3</option><option>JavaScript</option><option>C++</option><option>Java</option></select></label></div>
+        <div class="section-heading"><div><p class="eyebrow">WORKSPACE / PROBLEM A</p><h2 id="editor-heading">Code editor</h2></div><label class="language-label">Language <select id="language"><option>Python 3</option><option>JavaScript</option><option>C++</option><option>Java</option></select></label></div>
+        <div class="editor-toolbar"><span>main.<span id="editor-extension">py</span></span><div><label for="font-size">Font size</label> <select id="font-size"><option value="13">13</option><option value="14" selected>14</option><option value="16">16</option><option value="18">18</option></select><button id="reset-code" type="button" class="text-button">Reset draft</button></div></div>
         <label for="code-editor" class="sr-only">Practice code</label>
         <textarea id="code-editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="editor-note"># Write practice code here.
 # This simulation does not execute or grade submissions.</textarea>
-        <div class="editor-actions"><span id="editor-note" class="muted">Your code stays in this page and is never sent to the server.</span><div class="button-row"><button id="run-code" class="button button-secondary">Run</button><button id="submit-code" class="button button-primary">Submit</button></div></div>
-        <p id="editor-result" class="editor-result" role="status" aria-live="polite"></p>
+        <div class="editor-status"><span id="cursor-position">Ln 1, Col 1</span><span id="editor-note">Tab inserts spaces · Code remains in this browser tab</span></div>
+        <section class="input-panel" aria-labelledby="input-heading"><div class="input-head"><h3 id="input-heading">Input for local practice</h3><span>Not sent to server</span></div><div class="input-switch" role="group" aria-label="Input source"><button type="button" id="use-sample" class="input-choice is-selected" aria-pressed="true">Sample input</button><button type="button" id="use-custom" class="input-choice" aria-pressed="false">Custom input</button></div><label for="custom-input" class="sr-only">Custom input</label><textarea id="custom-input" class="custom-input" spellcheck="false" aria-label="Practice input" readonly>4
+3 7 -2 5</textarea></section>
+        <div class="editor-actions"><span class="muted">Run and Submit simulate assessment actions; no program runs.</span><div class="button-row"><button id="run-code" class="button button-secondary">Run code</button><button id="submit-code" class="button button-primary">Submit solution</button></div></div>
+        <section class="result-panel" aria-labelledby="result-heading"><div class="result-heading"><h3 id="result-heading">Result</h3><span id="result-state" class="result-state">Not run</span></div><p id="editor-result" class="editor-result" role="status" aria-live="polite">Select an input and click Run code to record a local practice action.</p><div class="output-grid"><div><strong>Expected sample output</strong><pre id="expected-output">13</pre></div><div><strong>Program output</strong><pre id="program-output">Not available — code execution is disabled.</pre></div></div><p id="submission-count" class="submission-count">Mock submissions this visit: 0</p></section>
       </section>
     </section>
 
