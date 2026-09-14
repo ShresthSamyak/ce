@@ -43,7 +43,7 @@ setup.bat
 run.bat
 ```
 
-`setup.bat` uses the Windows `py -3.12` launcher and creates `.venv`. If Python 3.12 is installed but the launcher is unavailable, create the virtual environment manually and install `backend\requirements.txt` with its Python interpreter.
+`setup.bat` creates `.venv` using the Windows `py -3.12` launcher when available, or a Python 3.12 `python` command on PATH.
 
 Ubuntu, from the `proctoring-lab` directory:
 
@@ -142,6 +142,6 @@ Use the virtual-environment interpreter if `python` points elsewhere: `.venv\Scr
 
 ## Limitations and ethical use
 
-This is a controlled measurement aid, not a proctoring product or an assessment bypass. JavaScript event delivery depends on the browser and OS. The page cannot observe arbitrary host processes, host windows, desktop overlays, or VM state unless those circumstances produce a browser-visible signal. Browser closure may prevent a final event from reaching the server. Manual markers are approximate. Heartbeat gaps are ambiguous. The mock editor has no real judge.
+This is a controlled measurement aid, not a proctoring product or an assessment bypass. JavaScript event delivery depends on the browser and OS. The page cannot observe arbitrary host processes, host windows, desktop overlays, or VM state unless those circumstances produce a browser-visible signal. Browser closure may prevent a final event from reaching the server. A full page reload creates a new idle client session; active-session recovery is not implemented. Manual markers are approximate. Heartbeat gaps are ambiguous. The mock editor has no real judge.
 
 Use it only with systems and accounts you control. Do not inject it into third-party pages, disable monitoring, spoof or suppress signals, or use it during an actual examination. A report's language should remain observational: **“The browser did not observe a visibility change during this experiment,”** never **“this bypasses proctoring.”**

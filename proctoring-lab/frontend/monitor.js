@@ -197,8 +197,8 @@ function keyCategory(key) {
 
 function selectedCharacterCount() {
   const editor = $("code-editor");
-  if (document.activeElement !== editor) return 0;
-  return Math.max(0, editor.selectionEnd - editor.selectionStart);
+  if (document.activeElement === editor) return Math.max(0, editor.selectionEnd - editor.selectionStart);
+  return window.getSelection()?.toString().length ?? 0;
 }
 
 function clipboardCharacterCount(event) {
@@ -363,14 +363,16 @@ function valueFrom(object, ...keys) {
 
 function renderSummary(analysis) {
   const summary = analysis.summary || analysis;
+  const longestGap = valueFrom(summary, "longest_heartbeat_gap_ms", "longest_gap_ms");
+  const averageInterval = valueFrom(summary, "average_heartbeat_interval_ms", "average_heartbeat_ms");
   const cards = [
     ["Duration", `${Number(valueFrom(summary, "duration_seconds", "total_duration_seconds") ?? Number(valueFrom(summary, "total_duration_ms") || 0) / 1000).toFixed(1)} s`],
     ["Focus losses", valueFrom(summary, "focus_loss_count") ?? 0],
     ["Visibility hidden", valueFrom(summary, "visibility_hidden_count") ?? 0],
     ["Fullscreen exits", valueFrom(summary, "fullscreen_exit_count") ?? 0],
     ["Paste events", valueFrom(summary, "paste_count") ?? 0],
-    ["Longest heartbeat gap", `${Math.round(Number(valueFrom(summary, "longest_heartbeat_gap_ms", "longest_gap_ms") || 0))} ms`],
-    ["Average heartbeat", `${Math.round(Number(valueFrom(summary, "average_heartbeat_interval_ms", "average_heartbeat_ms") || 0))} ms`],
+    ["Longest heartbeat gap", longestGap === null ? "Not measured" : `${Math.round(Number(longestGap))} ms`],
+    ["Average heartbeat", averageInterval === null ? "Not measured" : `${Math.round(Number(averageInterval))} ms`],
     ["Markers", valueFrom(summary, "marker_count") ?? 0],
   ];
   const container = $("summary-cards");
@@ -454,7 +456,7 @@ function renderHeartbeatGraph(points) {
     wrap.append(empty);
     return;
   }
-  const width = Math.max(650, 75 * intervals.length + 85);
+  const width = Math.min(1600, Math.max(650, 75 * intervals.length + 85));
   const height = 240, left = 55, right = 25, top = 20, bottom = 38;
   const plotW = width - left - right, plotH = height - top - bottom;
   const maxY = Math.max(9000, Math.ceil(Math.max(...intervals.map((p) => Number(p.delta_ms))) / 2000) * 2000);
@@ -463,9 +465,10 @@ function renderHeartbeatGraph(points) {
   const x = (i) => left + (firstTime === lastTime ? plotW / 2 : plotW * (timestamps[i] - firstTime) / (lastTime - firstTime));
   const y = (ms) => top + plotH * (1 - ms / maxY);
   const svg = svgNode("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Heartbeat interval by sequence; warning threshold 4000 milliseconds and large gap threshold 8000 milliseconds" });
+  svg.append(svgNode("text", { x: left, y: 12, fill: "#53677b", "font-size": 11 }, "Interval (ms)"));
   for (const threshold of [0, 4000, 8000]) {
     svg.append(svgNode("line", { x1: left, x2: width - right, y1: y(threshold), y2: y(threshold), stroke: threshold ? "#d9a87a" : "#8da2b7", "stroke-dasharray": threshold ? "5 4" : "none" }));
-    svg.append(svgNode("text", { x: 4, y: y(threshold) + 4, fill: "#53677b", "font-size": 11 }, `${threshold / 1000}s`));
+    svg.append(svgNode("text", { x: 4, y: y(threshold) + 4, fill: "#53677b", "font-size": 11 }, String(threshold)));
   }
   const path = intervals.map((point, i) => `${i ? "L" : "M"}${x(i)},${y(Number(point.delta_ms))}`).join(" ");
   svg.append(svgNode("path", { d: path, fill: "none", stroke: "#2862a0", "stroke-width": 2 }));
@@ -476,7 +479,9 @@ function renderHeartbeatGraph(points) {
     dot.append(svgNode("title", {}, `Heartbeat ${intervals[i].sequence ?? i + 1}: ${Math.round(ms)} ms at ${formatClock(timelineTime(intervals[i]))}`));
     svg.append(dot);
   }
-  svg.append(svgNode("text", { x: width / 2 - 25, y: height - 7, fill: "#53677b", "font-size": 11 }, "Time →"));
+  svg.append(svgNode("text", { x: left, y: height - 7, fill: "#53677b", "font-size": 11 }, formatClock(timelineTime(intervals[0]))));
+  svg.append(svgNode("text", { x: width - right, y: height - 7, fill: "#53677b", "font-size": 11, "text-anchor": "end" }, formatClock(timelineTime(intervals[intervals.length - 1]))));
+  svg.append(svgNode("text", { x: width / 2 - 23, y: height - 7, fill: "#53677b", "font-size": 11 }, "Time →"));
   wrap.append(svg);
 }
 
