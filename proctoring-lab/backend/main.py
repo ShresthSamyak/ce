@@ -81,6 +81,16 @@ def index():
 app.mount("/static", StaticFiles(directory=str(FRONTEND), check_dir=False), name="static")
 
 
+@app.get("/styles.css", include_in_schema=False)
+def stylesheet():
+    return FileResponse(FRONTEND / "styles.css", media_type="text/css")
+
+
+@app.get("/monitor.js", include_in_schema=False)
+def monitor_script():
+    return FileResponse(FRONTEND / "monitor.js", media_type="text/javascript")
+
+
 @app.post("/api/session/start", status_code=201)
 def start_session(payload: SessionStart):
     session = {

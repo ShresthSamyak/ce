@@ -96,6 +96,9 @@ def analyze_session(db: sqlite3.Connection, session_id: str) -> dict:
         visibility = [event["visibility_state"] for event in nearby_events if event["event_type"] == "visibilitychange"]
         fullscreen = [event for event in nearby_events if event["event_type"] == "fullscreenchange"]
         clipboard = [event["event_type"] for event in nearby_events if event["event_type"] in {"copy", "paste", "cut"}]
+        relevant_events = [event for event in nearby_events if event["event_type"] in {
+            "visibilitychange", "blur", "fullscreenchange", "copy", "paste", "cut"
+        }]
         matrix_row = {
             "action": marker["label"], "marker_id": marker["id"],
             "visibilitychange": ", ".join(visibility) if visibility else "not observed",
@@ -103,7 +106,7 @@ def analyze_session(db: sqlite3.Connection, session_id: str) -> dict:
             "fullscreenchange": "observed" if fullscreen else "not observed",
             "heartbeat_anomaly": ", ".join(hb["gap_level"] for hb in anomalies) if anomalies else "not observed",
             "clipboard_signal": ", ".join(clipboard) if clipboard else "not observed",
-            "browser_observable": "signal observed" if signals else "no listed signal observed in ±3 s",
+            "browser_observable": "listed signal observed" if relevant_events or anomalies else "no listed signal observed in ±3 s",
         }
         correlations.append({
             "marker": marker, "window_seconds": 3,

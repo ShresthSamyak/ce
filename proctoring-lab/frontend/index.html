@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Proctoring Lab — local assessment simulation</title>
-  <link rel="stylesheet" href="/styles.css">
-  <script src="/monitor.js" defer></script>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/monitor.js" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -38,6 +38,11 @@
         <button id="view-report" class="button button-quiet" disabled>OPEN HTML REPORT ↗</button>
       </div>
       <p id="app-message" class="app-message" role="status" aria-live="polite">Start a test to record browser events and two-second heartbeats.</p>
+    </section>
+
+    <section class="assessment-bar" aria-label="Assessment status">
+      <div class="assessment-title"><strong>Practice assessment</strong><span>Problem 1 of 1 · Sum of integers</span></div>
+      <div class="assessment-tools"><span class="elapsed-label">Elapsed <strong id="elapsed-time">00:00</strong></span><button id="toggle-fullscreen" class="button button-quiet">TOGGLE PAGE FULLSCREEN</button></div>
     </section>
 
     <section class="assessment-grid" aria-label="Mock coding assessment">
