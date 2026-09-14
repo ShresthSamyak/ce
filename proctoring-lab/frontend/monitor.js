@@ -464,7 +464,7 @@ function renderHeartbeatGraph(points) {
   const firstTime = Math.min(...timestamps), lastTime = Math.max(...timestamps);
   const x = (i) => left + (firstTime === lastTime ? plotW / 2 : plotW * (timestamps[i] - firstTime) / (lastTime - firstTime));
   const y = (ms) => top + plotH * (1 - ms / maxY);
-  const svg = svgNode("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Heartbeat interval by sequence; warning threshold 4000 milliseconds and large gap threshold 8000 milliseconds" });
+  const svg = svgNode("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Heartbeat interval over time; warning threshold 4000 milliseconds and large gap threshold 8000 milliseconds" });
   svg.append(svgNode("text", { x: left, y: 12, fill: "#53677b", "font-size": 11 }, "Interval (ms)"));
   for (const threshold of [0, 4000, 8000]) {
     svg.append(svgNode("line", { x1: left, x2: width - right, y1: y(threshold), y2: y(threshold), stroke: threshold ? "#d9a87a" : "#8da2b7", "stroke-dasharray": threshold ? "5 4" : "none" }));
