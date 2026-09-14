@@ -422,11 +422,16 @@ async function saveMarker(event) {
   if (state.status !== "active") return;
   const label = $("marker-label").value.trim().replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 100);
   if (!label) { $("marker-label").focus(); return; }
+  await addMarkerLabel(label);
+}
+
+async function addMarkerLabel(label) {
+  if (state.status !== "active") return;
   const timestampClient = new Date().toISOString();
   try {
     await api("/api/marker", { session_id: state.id, label, timestamp_client: timestampClient });
     appendLive("marker", { label, timestamp_client: timestampClient });
-    $("marker-dialog").close();
+    if ($("marker-dialog").open) $("marker-dialog").close();
     setMessage(`Marker saved: ${label}`);
   } catch (error) {
     setMessage(`Marker could not be saved: ${error.message}`, true);
@@ -645,67 +650,168 @@ function updateCursorPosition() {
   $("cursor-position").textContent = `Ln ${lines.length}, Col ${lines[lines.length - 1].length + 1}`;
 }
 
-function switchLanguage() {
-  const nextLanguage = $("language").value;
-  editorDrafts[currentLanguage] = $("code-editor").value;
-  currentLanguage = nextLanguage;
-  $("code-editor").value = editorDrafts[nextLanguage] ?? starterCode[nextLanguage];
-  $("editor-extension").textContent = { "Python 3": "py", JavaScript: "js", "C++": "cpp", Java: "java" }[nextLanguage];
-  updateCursorPosition();
+function draftKey(question = currentQuestion, language = currentLanguage) {
+  return `${question}:${language}`;
 }
 
-function setInputMode(mode) {
-  const wasCustom = $("use-custom").getAttribute("aria-pressed") === "true";
-  if (wasCustom) customInputDraft = $("custom-input").value;
-  const sample = mode === "sample";
+function saveCurrentDraft() {
+  editorDrafts[draftKey()] = $("code-editor").value;
+  if (inputModes[currentQuestion] === "custom") customInputDrafts[currentQuestion] = $("custom-input").value;
+}
+
+function renderInputMode() {
+  const sample = (inputModes[currentQuestion] || "sample") === "sample";
   $("use-sample").classList.toggle("is-selected", sample);
   $("use-custom").classList.toggle("is-selected", !sample);
   $("use-sample").setAttribute("aria-pressed", String(sample));
   $("use-custom").setAttribute("aria-pressed", String(!sample));
   $("custom-input").readOnly = sample;
-  if (sample) $("custom-input").value = $("sample-input").textContent.trim();
-  else { $("custom-input").value = customInputDraft; $("custom-input").focus(); }
-  $("expected-output").textContent = sample ? "13" : "Not computed for custom input.";
+  $("custom-input").value = sample ? questions[currentQuestion].sampleInput : (customInputDrafts[currentQuestion] || "");
+  $("expected-output").textContent = sample ? questions[currentQuestion].sampleOutput : "Not computed for custom input.";
 }
 
-function simulateAssessmentAction(action) {
-  const isSubmission = action === "Submit";
-  if (isSubmission) {
-    mockSubmissionCount += 1;
-    $("submission-count").textContent = `Mock submissions this visit: ${mockSubmissionCount}`;
-    $("problem-state").textContent = `Mock submitted ${mockSubmissionCount} time${mockSubmissionCount === 1 ? "" : "s"}`;
+function renderQuestion() {
+  const question = questions[currentQuestion];
+  $("problem-kicker").textContent = `QUESTION ${question.number} / 3 · PRACTICE`;
+  $("problem-title").textContent = question.title;
+  $("problem-description").textContent = question.description;
+  $("input-format").textContent = question.input;
+  $("output-format").textContent = question.output;
+  $("constraints-list").replaceChildren(...question.constraints.map((constraint) => {
+    const li = document.createElement("li"); li.textContent = constraint; return li;
+  }));
+  $("sample-input").textContent = question.sampleInput;
+  $("sample-output").textContent = question.sampleOutput;
+  $("problem-explanation").textContent = question.explanation;
+  $("workspace-question").textContent = `WORKSPACE / QUESTION ${question.number}`;
+  $("code-editor").value = editorDrafts[draftKey()] ?? starterCode[currentLanguage];
+  lastEditorLength = $("code-editor").value.length;
+  renderInputMode();
+  for (const tab of document.querySelectorAll("[data-question]")) {
+    const selected = tab.dataset.question === currentQuestion;
+    tab.classList.toggle("is-current", selected);
+    if (selected) tab.setAttribute("aria-current", "page"); else tab.removeAttribute("aria-current");
   }
-  $("result-state").textContent = isSubmission ? "Mock submitted" : "Simulation only";
+  $("result-state").textContent = "Not run";
+  $("result-state").classList.remove("is-simulated");
+  $("editor-result").textContent = "Mock Run/Submit records are independent of code correctness. Source remains in this browser tab.";
+  $("program-output").textContent = "Unavailable — code execution is disabled.";
+  renderSubmissionHistory();
+  updateCursorPosition();
+}
+
+function switchQuestion(questionId) {
+  if (!questions[questionId] || questionId === currentQuestion) return;
+  saveCurrentDraft();
+  currentQuestion = questionId;
+  renderQuestion();
+}
+
+function switchLanguage() {
+  const nextLanguage = $("language").value;
+  saveCurrentDraft();
+  currentLanguage = nextLanguage;
+  $("code-editor").value = editorDrafts[draftKey()] ?? starterCode[nextLanguage];
+  lastEditorLength = $("code-editor").value.length;
+  $("editor-extension").textContent = { Python: "py", C: "c", "C++": "cpp", Java: "java" }[nextLanguage];
+  updateCursorPosition();
+}
+
+function setInputMode(mode) {
+  if (inputModes[currentQuestion] === "custom") customInputDrafts[currentQuestion] = $("custom-input").value;
+  inputModes[currentQuestion] = mode;
+  renderInputMode();
+  if (mode === "custom") $("custom-input").focus();
+}
+
+function renderSubmissionHistory() {
+  const list = $("submission-history");
+  list.replaceChildren();
+  const items = state.submissions.filter((item) => item.question_id === currentQuestion).slice(-12).reverse();
+  if (!items.length) { const empty = document.createElement("li"); empty.textContent = "No mock submissions for this question."; list.append(empty); }
+  for (const item of items) {
+    const li = document.createElement("li");
+    const time = item.timestamp_server || item.server_timestamp || item.timestamp_client;
+    li.textContent = `#${item.submission_number} · ${formatClock(time)} · ${item.action.toUpperCase()} · ${item.language} · Mock ${item.result} (scripted)`;
+    list.append(li);
+  }
+  const submits = state.submissions.filter((item) => item.action === "submit");
+  $("submission-count").textContent = `Mock submissions this session: ${submits.length}`;
+  for (const id of Object.keys(questions)) {
+    const count = submits.filter((item) => item.question_id === id).length;
+    $(`nav-state-${id}`).textContent = count ? `${count} mock submission${count === 1 ? "" : "s"}` : "Not submitted";
+  }
+}
+
+async function simulateAssessmentAction(action) {
+  if (state.status !== "active") return;
+  saveCurrentDraft();
+  $("run-code").disabled = true;
+  $("submit-code").disabled = true;
+  $("result-state").textContent = "Recording…";
+  try {
+    const record = await api("/api/submission", {
+      session_id: state.id, question_id: currentQuestion, language: currentLanguage,
+      action, code_length: $("code-editor").value.length,
+      timestamp_client: new Date(Date.now()).toISOString(),
+    });
+    state.submissions.push(record);
+    renderSubmissionHistory();
+    $("result-state").textContent = `Mock ${record.result}`;
+    $("editor-result").textContent = `${record.evaluation_note || "Mock result only; source code was not evaluated."} The result is scripted and independent of your code or custom input.`;
+  } catch (error) {
+    $("result-state").textContent = "Record failed";
+    $("editor-result").textContent = `Mock ${action} could not be recorded: ${error.message}`;
+  } finally {
+    $("run-code").disabled = state.status !== "active";
+    $("submit-code").disabled = state.status !== "active";
+  }
   $("result-state").classList.add("is-simulated");
-  $("editor-result").textContent = isSubmission
-    ? "Mock submission recorded in this browser tab. No source code was sent, executed, graded, or saved."
-    : "Run requested. This safe simulation does not execute code, so it cannot produce a program output or verdict.";
-  $("program-output").textContent = "Not available — code execution is disabled.";
+  $("program-output").textContent = "Unavailable — code execution is disabled. The mock result above is scripted.";
   $("result-heading").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function initEditor() {
   const editor = $("code-editor");
-  editorDrafts[currentLanguage] = editor.value;
+  editorDrafts[draftKey()] = editor.value;
+  lastEditorLength = editor.value.length;
   for (const type of ["input", "keyup", "click", "select"]) editor.addEventListener(type, updateCursorPosition);
+  editor.addEventListener("input", () => {
+    const newLength = editor.value.length;
+    const delta = newLength - lastEditorLength;
+    const magnitude = Math.abs(delta);
+    recordEvent("editor_change", {
+      old_length: lastEditorLength,
+      new_length: newLength,
+      delta_length: delta,
+      change_size: magnitude <= 1 ? "SMALL_CHANGE" : magnitude <= 20 ? "MEDIUM_CHANGE" : "LARGE_CHANGE",
+    });
+    lastEditorLength = newLength;
+    editorDrafts[draftKey()] = editor.value;
+  });
   editor.addEventListener("keydown", (event) => {
     if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey) return;
     event.preventDefault();
     const start = editor.selectionStart, end = editor.selectionEnd;
     editor.setRangeText("    ", start, end, "end");
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
     updateCursorPosition();
   });
   $("language").addEventListener("change", switchLanguage);
+  for (const tab of document.querySelectorAll("[data-question]")) tab.addEventListener("click", () => switchQuestion(tab.dataset.question));
   $("font-size").addEventListener("change", () => { editor.style.fontSize = `${$("font-size").value}px`; });
   $("reset-code").addEventListener("click", () => {
     if (!window.confirm("Replace the current draft with the starter comment?")) return;
     editor.value = starterCode[currentLanguage];
     editorDrafts[currentLanguage] = editor.value;
+    editorDrafts[draftKey()] = editor.value;
+    lastEditorLength = editor.value.length;
     editor.focus();
     updateCursorPosition();
   });
   $("use-sample").addEventListener("click", () => setInputMode("sample"));
   $("use-custom").addEventListener("click", () => setInputMode("custom"));
+  $("custom-input").addEventListener("input", () => { if (inputModes[currentQuestion] === "custom") customInputDrafts[currentQuestion] = $("custom-input").value; });
   $("copy-sample").addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText($("sample-input").textContent.trim());
@@ -714,9 +820,17 @@ function initEditor() {
       $("editor-result").textContent = `Sample could not be copied: ${error.message}`;
     }
   });
-  $("run-code").addEventListener("click", () => simulateAssessmentAction("Run"));
-  $("submit-code").addEventListener("click", () => simulateAssessmentAction("Submit"));
+  $("run-code").addEventListener("click", () => simulateAssessmentAction("run"));
+  $("submit-code").addEventListener("click", () => simulateAssessmentAction("submit"));
+  renderQuestion();
   updateCursorPosition();
+}
+
+function setTelemetryOpen(open) {
+  $("telemetry-sidebar").classList.toggle("is-open", open);
+  $("telemetry-sidebar").setAttribute("aria-hidden", String(!open));
+  $("toggle-telemetry").setAttribute("aria-expanded", String(open));
+  $("telemetry-backdrop").hidden = !open;
 }
 
 function init() {
@@ -730,12 +844,24 @@ function init() {
   $("cancel-marker").addEventListener("click", () => $("marker-dialog").close());
   $("marker-form").addEventListener("submit", saveMarker);
   $("experiment-select").addEventListener("change", renderExperiment);
+  $("vm-mode").addEventListener("change", () => {
+    if ($("vm-mode").checked) $("experiment-select").value = "g";
+    renderExperiment();
+    setMessage($("vm-mode").checked ? "VM guest mode selected. Carry out host actions manually, then add before/after markers." : "Normal browser experiment mode selected.");
+  });
+  for (const button of document.querySelectorAll("[data-marker]")) button.addEventListener("click", () => addMarkerLabel(button.dataset.marker));
+  $("event-filter").addEventListener("change", applyEventFilter);
+  $("toggle-telemetry").addEventListener("click", () => setTelemetryOpen($("toggle-telemetry").getAttribute("aria-expanded") !== "true"));
+  $("close-telemetry").addEventListener("click", () => setTelemetryOpen(false));
+  $("telemetry-backdrop").addEventListener("click", () => setTelemetryOpen(false));
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") setTelemetryOpen(false); });
   $("view-report").addEventListener("click", () => window.open(`/api/session/${encodeURIComponent(state.id)}/report`, "_blank", "noopener"));
   $("toggle-fullscreen").addEventListener("click", async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch (error) { setMessage(`Page fullscreen request failed: ${error.message}`, true); }
+    // A failed request is recorded as a page signal, without the error text.
   });
 }
 

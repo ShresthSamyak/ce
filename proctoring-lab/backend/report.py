@@ -222,10 +222,18 @@ def render_report(data: dict[str, Any]) -> str:
             for signal in entry["signals"]
         ) or "No listed browser signal observed in ±3 s"
         gap = observed["heartbeat_gap_ms"]
+        snapshot = observed["browser_state_snapshot"]
+        state_text = (
+            f"visibility={snapshot['visibility_state']}, "
+            f"focus={'yes' if snapshot['has_focus'] else 'no'}, "
+            f"fullscreen={'yes' if snapshot['fullscreen'] else 'no'}"
+            if snapshot else "No state snapshot in window"
+        )
         correlations.append([
             _time(entry["marker"]["timestamp_server"]),
             entry["marker"]["label"], signals,
             f"{gap:.1f} ms" if gap is not None else "No interval in window",
+            state_text,
         ])
     matrix = []
     for row in data["detection_matrix"]:
@@ -300,7 +308,8 @@ svg text{{fill:#435669}}.hb-normal{{fill:#147475}}.hb-warning{{fill:#a77718}}.hb
 <section><h2>Focus, visibility and fullscreen statistics</h2>
 <p>Focus losses: {summary["focus_loss_count"]} · Hidden transitions: {summary["visibility_hidden_count"]} · Fullscreen exits: {summary["fullscreen_exit_count"]} · Fullscreen request errors: {summary["fullscreen_error_count"]}.</p>
 <p class="muted">Bands are reconstructed from received state snapshots. Gray means no snapshot was available yet. Receive time may differ from the action time.</p>
-{_state_bands(data, start, end)}</section>
+{_state_bands(data, start, end)}
+<p class="muted">Green: visible / focused / fullscreen active. Red: hidden / unfocused / fullscreen inactive. Gray: unknown. Hover over each segment for its state label.</p></section>
 <section><h2>Visual event timeline</h2><p class="muted">Dots and rows use server receipt time; event rows also show browser performance time and sequence when available.</p>
 <div class="track">{''.join(dots)}</div><p>Start {h(_time(session["started_at"]))} · End {h(_time(session["ended_at"])) if session["ended_at"] else "active"}</p>
 <div class="wide"><table><thead><tr><th>UTC time</th><th>Category</th><th>Observation</th></tr></thead><tbody>{timeline_body}</tbody></table></div></section>
@@ -315,7 +324,7 @@ svg text{{fill:#435669}}.hb-normal{{fill:#147475}}.hb-warning{{fill:#a77718}}.hb
 <p class="muted">Results are local mock judge statuses; no submitted code is stored in this report.</p>
 {_table(["#", "UTC time", "Question", "Language", "Action", "Code length", "Mock result"], submissions, "No runs or submissions recorded.")}</section>
 <section><h2>Marker correlation</h2><p class="muted">Signals received within ±3 seconds of each manually added marker. The interval column includes normal heartbeats too.</p>
-{_table(["UTC time", "Marker", "Signals", "Largest nearby interval"], correlations, "No markers recorded.")}</section>
+{_table(["UTC time", "Marker", "Signals", "Largest nearby interval", "Latest nearby state"], correlations, "No markers recorded.")}</section>
 <section><h2>Measured detection matrix</h2><p class="muted">One row per marker in this session. “Not observed” applies only to that marker's ±3-second window.</p>
 <div class="wide">{_table(["Action", "Window blur", "Document hidden", "Fullscreen exit", "Heartbeat interval", "Network change", "Browser observed"], matrix, "No measured marker actions yet.")}</div></section>
 <section><h2>Limitations</h2><p class="note">{h(data["limitations"])}</p>
