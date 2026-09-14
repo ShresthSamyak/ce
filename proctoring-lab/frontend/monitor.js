@@ -10,6 +10,8 @@ const state = {
   heartbeatInFlight: false,
   heartbeatSequence: 0,
   eventCount: 0,
+  pendingEvents: new Set(),
+  pendingHeartbeatRequest: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -17,7 +19,7 @@ const experimentTemplates = {
   a: { title: "A · Normal browser tab switch", steps: ["Start the session.", "Open another browser tab and wait a few seconds.", "Return to this tab.", "Add a marker labeled “Browser tab switch”."], marker: "Browser tab switch" },
   b: { title: "B · Alt-Tab to another application", steps: ["Start the session.", "Use Alt-Tab to switch to another application.", "Return to this browser.", "Add a marker labeled “Alt-Tab to application”."], marker: "Alt-Tab to application" },
   c: { title: "C · Minimize browser", steps: ["Start the session.", "Minimize the browser window and wait a few seconds.", "Restore it.", "Add a marker labeled “Browser minimized”."], marker: "Browser minimized" },
-  d: { title: "D · Enter and exit fullscreen", steps: ["Start the session.", "Enter browser fullscreen (usually F11) or page fullscreen if available.", "Exit fullscreen.", "Add a marker labeled “Fullscreen enter and exit”."], marker: "Fullscreen enter and exit" },
+  d: { title: "D · Enter and exit fullscreen", steps: ["Start the session.", "Use TOGGLE PAGE FULLSCREEN above the problem to enter page fullscreen.", "Use the same button or Escape to exit. Browser F11 mode may behave differently.", "Add a marker labeled “Fullscreen enter and exit”."], marker: "Fullscreen enter and exit" },
   e: { title: "E · Copy and paste", steps: ["Start the session.", "Copy a short piece of practice text in this local page.", "Paste it into the editor.", "Add a marker labeled “Copy and paste”."], marker: "Copy and paste" },
   f: { title: "F · Launch benign overlay", steps: ["Start the session.", "Launch overlay/benign_overlay.py on the same desktop.", "Show, move, or focus its visible window. Return to the browser.", "Add a marker labeled “Benign overlay opened”."], marker: "Benign overlay opened" },
   g: { title: "G · VMware host test", steps: ["Inside the guest VM, start this simulation and keep the browser open.", "From the host OS, minimize the VMware application. Do not automate this action.", "Wait 10 seconds.", "Restore VMware.", "Inside the guest browser, add a marker labeled “VMware minimized”."], marker: "VMware minimized" },
@@ -71,10 +73,10 @@ function setMessage(message, error = false) {
 function setStatus(status) {
   state.status = status;
   const badge = $("session-status");
-  badge.textContent = { idle: "Ready", starting: "Starting…", active: "Recording", ending: "Ending…", ended: "Ended" }[status];
+  badge.textContent = { idle: "Ready", starting: "Starting…", active: "Recording", ending: "Ending…", "end-error": "Save error", ended: "Ended" }[status];
   badge.className = `status-badge ${status === "active" ? "status-active" : status === "ended" ? "status-ended" : "status-idle"}`;
   $("start-test").disabled = status !== "idle";
-  $("end-test").disabled = status !== "active";
+  $("end-test").disabled = !["active", "end-error"].includes(status);
   $("add-marker").disabled = status !== "active";
   $("view-report").disabled = status !== "ended";
 }
@@ -179,7 +181,9 @@ function recordEvent(eventType, metadata = {}, unload = false) {
   };
   appendLive(eventType, payload);
   if (unload) { sendUnloadEvent(payload); return; }
-  api("/api/events", payload).catch((error) => setMessage(`Event could not be saved: ${error.message}`, true));
+  const request = api("/api/events", payload).catch((error) => setMessage(`Event could not be saved: ${error.message}`, true));
+  state.pendingEvents.add(request);
+  request.finally(() => state.pendingEvents.delete(request));
 }
 
 function keyCategory(key) {
@@ -234,7 +238,7 @@ async function sendHeartbeat() {
   if (state.status !== "active" || state.heartbeatInFlight) return;
   state.heartbeatInFlight = true;
   try {
-    const result = await api("/api/heartbeat", {
+    const request = api("/api/heartbeat", {
       session_id: state.id,
       sequence: ++state.heartbeatSequence,
       client_timestamp: new Date().toISOString(),
@@ -242,12 +246,15 @@ async function sendHeartbeat() {
       has_focus: document.hasFocus(),
       fullscreen: Boolean(document.fullscreenElement),
     });
-    if (state.status === "active" && result.gap_level && result.gap_level !== "NORMAL") {
+    state.pendingHeartbeatRequest = request;
+    const result = await request;
+    if (state.status === "active" && ["WARNING", "LARGE GAP"].includes(result.gap_level)) {
       appendLive("heartbeat", result);
     }
   } catch (error) {
     if (state.status === "active") setMessage(`Heartbeat could not be saved: ${error.message}`, true);
   } finally {
+    state.pendingHeartbeatRequest = null;
     state.heartbeatInFlight = false;
   }
 }
@@ -272,8 +279,10 @@ async function startTest() {
     setStatus("active");
     setMessage("Recording page events and sending a heartbeat every two seconds.");
     await sendHeartbeat();
-    state.heartbeatTimer = window.setInterval(sendHeartbeat, 2000);
-    state.elapsedTimer = window.setInterval(updateElapsed, 1000);
+    if (state.status === "active") {
+      state.heartbeatTimer = window.setInterval(sendHeartbeat, 2000);
+      state.elapsedTimer = window.setInterval(updateElapsed, 1000);
+    }
   } catch (error) {
     setStatus("idle");
     setMessage(`Could not start session: ${error.message}`, true);
@@ -281,15 +290,22 @@ async function startTest() {
 }
 
 async function endTest() {
-  if (state.status !== "active") return;
+  if (!["active", "end-error"].includes(state.status)) return;
   setStatus("ending");
   window.clearInterval(state.heartbeatTimer);
   window.clearInterval(state.elapsedTimer);
   updateElapsed();
   setMessage("Saving and analyzing the session…");
+  await Promise.allSettled([...state.pendingEvents, state.pendingHeartbeatRequest].filter(Boolean));
   try {
     await api("/api/session/end", { session_id: state.id });
-    setStatus("ended");
+  } catch (error) {
+    setStatus("end-error");
+    setMessage(`Session end could not be saved: ${error.message}. Click END TEST to retry.`, true);
+    return;
+  }
+  setStatus("ended");
+  try {
     const analysis = await api(`/api/session/${encodeURIComponent(state.id)}/analysis`);
     renderAnalysis(analysis);
     $("analysis-section").hidden = false;
@@ -300,7 +316,6 @@ async function endTest() {
     $("analysis-section").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     // Capture remains frozen after END. The report link still permits a retry.
-    setStatus("ended");
     setMessage(`Session capture stopped, but a result could not be loaded: ${error.message}`, true);
   }
 }
@@ -315,7 +330,7 @@ function showMarkerDialog() {
 async function saveMarker(event) {
   event.preventDefault();
   if (state.status !== "active") return;
-  const label = $("marker-label").value.trim().replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 120);
+  const label = $("marker-label").value.trim().replace(/[\x00-\x1f\x7f]/g, " ").slice(0, 100);
   if (!label) { $("marker-label").focus(); return; }
   const timestampClient = new Date().toISOString();
   try {
@@ -443,7 +458,9 @@ function renderHeartbeatGraph(points) {
   const height = 240, left = 55, right = 25, top = 20, bottom = 38;
   const plotW = width - left - right, plotH = height - top - bottom;
   const maxY = Math.max(9000, Math.ceil(Math.max(...intervals.map((p) => Number(p.delta_ms))) / 2000) * 2000);
-  const x = (i) => left + (intervals.length === 1 ? plotW / 2 : i * plotW / (intervals.length - 1));
+  const timestamps = intervals.map((point) => new Date(timelineTime(point)).getTime());
+  const firstTime = Math.min(...timestamps), lastTime = Math.max(...timestamps);
+  const x = (i) => left + (firstTime === lastTime ? plotW / 2 : plotW * (timestamps[i] - firstTime) / (lastTime - firstTime));
   const y = (ms) => top + plotH * (1 - ms / maxY);
   const svg = svgNode("svg", { width, height, viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": "Heartbeat interval by sequence; warning threshold 4000 milliseconds and large gap threshold 8000 milliseconds" });
   for (const threshold of [0, 4000, 8000]) {
@@ -480,7 +497,13 @@ function renderCorrelations(correlations) {
     const note = document.createElement("p");
     const signals = correlation.observed || correlation.signals || {};
     if (Array.isArray(signals)) {
-      note.textContent = signals.length ? signals.map((signal) => typeof signal === "string" ? signal : signal.event_type || signal.kind).join(" · ") : "No browser signals observed within ±3 seconds.";
+      note.textContent = signals.length ? signals.map((signal) => {
+        if (typeof signal === "string") return signal;
+        if (signal.event_type === "visibilitychange") return `visibilitychange: ${signal.visibility_state}`;
+        if (signal.event_type === "heartbeat_gap") return `heartbeat gap: ${Math.round(signal.delta_ms)} ms (${signal.gap_level})`;
+        if (["copy", "paste", "cut"].includes(signal.event_type)) return `${signal.event_type}: ${signal.metadata?.character_count ?? 0} characters`;
+        return signal.event_type || signal.kind || "event";
+      }).join(" · ") : (correlation.observation || "No browser signals observed within ±3 seconds.");
     } else {
       const parts = Object.entries(signals).map(([key, value]) => `${key.replaceAll("_", " ")}: ${signalText(value)}`);
       note.textContent = parts.length ? parts.join(" · ") : "No browser signals observed within ±3 seconds.";

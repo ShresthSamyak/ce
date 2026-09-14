@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -41,13 +42,14 @@ def require_active(db: sqlite3.Connection, session_id: UUID) -> None:
         raise HTTPException(409, "Session has ended")
 
 
-app = FastAPI(title="PROCTORING-LAB", version="1.0.0")
-FRONTEND = PROJECT_ROOT / "frontend"
-
-
-@app.on_event("startup")
-def startup() -> None:
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
     initialize_database()
+    yield
+
+
+app = FastAPI(title="PROCTORING-LAB", version="1.0.0", lifespan=lifespan)
+FRONTEND = PROJECT_ROOT / "frontend"
 
 
 @app.middleware("http")
@@ -127,6 +129,8 @@ def record_event(payload: EventIn):
             "modifier", "navigation", "editing", "function", "character", "other"
         }:
             raise HTTPException(422, "Invalid key category")
+        if any(type(metadata[key]) is not bool for key in ("ctrl", "alt", "shift", "meta", "repeat") if key in metadata):
+            raise HTTPException(422, "Key modifiers must be booleans")
     elif payload.event_type in {"copy", "paste", "cut"}:
         if metadata.keys() - {"character_count"}:
             raise HTTPException(422, "Clipboard metadata may contain only character_count")

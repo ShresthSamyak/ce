@@ -120,6 +120,30 @@ def test_rejects_sensitive_metadata_and_ended_session(client: TestClient):
     assert bad_key.status_code == 422
     bad_clipboard = client.post("/api/events", json=event_payload(session_id, "paste", metadata={"text": "Secret"}))
     assert bad_clipboard.status_code == 422
+    bad_modifier = client.post("/api/events", json=event_payload(session_id, "keydown", metadata={"keyCategory": "character", "ctrl": "secret"}))
+    assert bad_modifier.status_code == 422
+    too_large = client.post("/api/events", content="x" * 8193, headers={"content-type": "application/json"})
+    assert too_large.status_code == 413
     assert client.post("/api/session/end", json={"session_id": session_id}).status_code == 200
     assert client.post("/api/events", json=event_payload(session_id)).status_code == 409
     assert client.get("/api/session/not-a-uuid/analysis").status_code == 422
+
+
+def test_matrix_ignores_marker_typing_as_action_signal(client: TestClient):
+    session_id = start(client)
+    assert client.post("/api/events", json=event_payload(session_id, "keydown", metadata={
+        "keyCategory": "character", "ctrl": False, "alt": False,
+        "shift": False, "meta": False, "repeat": False,
+    })).status_code == 201
+    assert client.post("/api/marker", json={
+        "session_id": session_id, "label": "VMware minimized",
+        "timestamp_client": BASE.isoformat(),
+    }).status_code == 201
+    matrix = client.get(f"/api/session/{session_id}/analysis").json()["detection_matrix"]
+    assert matrix[0]["browser_observable"] == "no listed signal observed in ±3 s"
+
+
+def test_frontend_is_served(client: TestClient):
+    assert client.get("/").status_code == 200
+    assert client.get("/styles.css").status_code == 200
+    assert client.get("/monitor.js").status_code == 200

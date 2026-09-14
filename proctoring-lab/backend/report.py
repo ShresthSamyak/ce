@@ -62,7 +62,10 @@ def _heartbeat_chart(points: list[dict]) -> str:
     left, right, top, bottom = 58, 20, 18, 36
     plot_width = width - left - right
     plot_height = height - top - bottom
-    x = lambda i: left + (i / max(1, len(values) - 1)) * plot_width
+    first_time = datetime.fromisoformat(measured[0]["timestamp_server"])
+    times = [(datetime.fromisoformat(point["timestamp_server"]) - first_time).total_seconds() for point in measured]
+    time_span = max(1.0, times[-1])
+    x = lambda i: left + (times[i] / time_span) * plot_width
     y = lambda value: top + plot_height - value / max_y * plot_height
     parts = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Heartbeat interval in milliseconds over time">']
     for level, label in ((4000, "4 s"), (8000, "8 s")):
